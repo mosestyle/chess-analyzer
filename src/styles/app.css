@@ -422,3 +422,66 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
   .summary-dashboard .phase-card { padding-inline: 16px; }
   .mobile-review-card .review-card { height: 152px; }
 }
+
+/* 0.2.0 desktop review layout ------------------------------------------------
+   The right panel now has a fixed footprint that follows the board height.
+   Commentary, engine lines, graph and navigation each get their own slot, so
+   longer text or additional PV lines can never push Previous/Next downward. */
+@media (min-width: 861px) {
+  .active-review .review-side {
+    height: min(679px, calc(100dvh - 196px));
+    max-height: none;
+    min-height: 500px;
+    overflow: hidden;
+    display: grid;
+    grid-template-areas:
+      "card"
+      "actions"
+      "engine"
+      "graph"
+      "nav";
+    grid-template-rows: 158px auto minmax(0, 1fr) auto auto;
+    gap: 10px;
+  }
+
+  .active-review .desktop-review-card { grid-area: card; min-height: 0; }
+  .active-review .desktop-review-card .review-card {
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;
+  }
+
+  .active-review .review-actions { grid-area: actions; }
+
+  .active-review .review-engine-scroll {
+    grid-area: engine;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 3px;
+  }
+  .active-review .review-engine-scroll:empty { visibility: hidden; }
+  .active-review .engine-lines-panel h3 { margin: 2px 0 4px; }
+
+  .active-review .review-graph-slot {
+    grid-area: graph;
+    min-height: 0;
+  }
+  .active-review .review-graph-slot .graph-wrap { margin-top: 0; }
+  .active-review .review-graph-slot .eval-graph { height: 102px; }
+
+  .active-review .review-side .prev-next {
+    grid-area: nav;
+    position: static;
+    margin-top: 0;
+    padding: 0;
+    background: none;
+    align-self: end;
+  }
+}
+
+@media (max-width: 860px) {
+  .review-engine-scroll { overflow: visible; }
+  .review-graph-slot .graph-wrap { margin-top: 16px; }
+}

@@ -1,4 +1,4 @@
-CHESS ANALYZER V0.1.2 — START HERE
+CHESS ANALYZER V0.2.0 — START HERE
 
 UPDATING AN EXISTING GITHUB REPOSITORY
 1. Extract this ZIP.
@@ -25,4 +25,4 @@ For local development:
   npm install
   npm run dev
 
-See UPDATE_NOTES_0.1.2.md for this release's fixes.
+See UPDATE_NOTES_0.2.0.md for this release's fixes and analyzer changes.

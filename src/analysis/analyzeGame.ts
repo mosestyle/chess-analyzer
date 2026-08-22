@@ -4,7 +4,7 @@ import { ANALYSIS_PRESETS } from '../engine/presets';
 import type { AnalysisQuality, Classification, EngineAnalysis, EngineMode, GameReview, ReviewMove } from '../types';
 import { START_FEN, moveToUci, movedPieceIsEnPrise } from '../chess/helpers';
 import { detectOpening, isLikelyBookMove } from '../chess/openings';
-import { classifyMove, expectedLoss, specialTags } from './classification';
+import { classifyMove, expectedLoss, moverExpectedScore, specialTags } from './classification';
 import { sideAccuracy } from './accuracy';
 import { explainMove } from './explanations';
 
@@ -103,9 +103,10 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     for (let i = 0; i < moves.length; i++) {
       const color = moves[i].source.color as 'w' | 'b';
       const loss = expectedLoss(analyses[i].scoreCp, analyses[i + 1].scoreCp, color);
-      const isBestCandidate = moves[i].uci === analyses[i].bestMove && !(i < 18 && isLikelyBookMove(sans, i));
-      const isImportantError = loss >= 0.075;
-      if (isBestCandidate || isImportantError) detailCandidates.push(i);
+      const isBestCandidate = moves[i].uci === analyses[i].bestMove && !(i < 24 && isLikelyBookMove(sans, i));
+      const mateCandidate = Boolean(analyses[i].mate);
+      const isImportantError = loss >= 0.10;
+      if (isBestCandidate || isImportantError || mateCandidate) detailCandidates.push(i);
     }
 
     for (let n = 0; n < detailCandidates.length; n++) {
@@ -129,29 +130,34 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     const color = move.source.color as 'w' | 'b';
     const loss = expectedLoss(before.scoreCp, after.scoreCp, color);
     const bestMove = before.bestMove;
+    const legalCount = new Chess(move.fenBefore).moves().length;
     const classification = classifyMove({
       loss,
       actualUci: move.uci,
       bestUci: bestMove,
       lines: before.lines,
       color,
-      isBook: index < 18 && isLikelyBookMove(sans, index),
+      isBook: index < 24 && isLikelyBookMove(sans, index),
       fenBefore: move.fenBefore,
       fenAfter: move.fenAfter,
       piece: move.source.piece,
       captured: move.source.captured,
+      legalCount,
+      beforeCp: before.scoreCp,
+      afterCp: after.scoreCp,
     });
     const tags = specialTags({
       loss,
       beforeCp: before.scoreCp,
       afterCp: after.scoreCp,
+      beforeMate: before.mate,
+      afterMate: after.mate,
       color,
       lines: before.lines,
       bestUci: bestMove,
       actualUci: move.uci,
       classification,
     });
-    const legalCount = new Chess(move.fenBefore).moves().length;
     if (legalCount === 1 && !tags.includes('Forced Move')) tags.push('Forced Move');
     if (['Mistake', 'Blunder'].includes(classification) && movedPieceIsEnPrise(move.fenAfter, move.uci.slice(2, 4)) && !tags.includes('Hanging Piece')) tags.push('Hanging Piece');
     const review: ReviewMove = {
@@ -178,18 +184,31 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       san: review.san,
       bestMove: review.bestMove,
       fenBefore: review.fenBefore,
+      fenAfter: review.fenAfter,
       beforeCp: review.evalBefore,
       afterCp: review.evalAfter,
+      replyLine: after.lines[0]?.pv || [],
     });
     return review;
   });
 
-  // A "Miss" is an error immediately after the opponent handed over a meaningful opportunity.
+  // A "Miss" is not just any error after an opponent error. V0.2 checks that
+  // the opponent actually handed over a meaningful increase in expected score
+  // and that the player then gave a substantial part of that opportunity back.
   for (let i = 1; i < reviewMoves.length; i++) {
     const previous = reviewMoves[i - 1];
     const current = reviewMoves[i];
+    const beforeOpponentMove = moverExpectedScore(previous.evalBefore, current.color);
+    const afterOpponentMove = moverExpectedScore(current.evalBefore, current.color);
+    const opportunityGain = Math.max(0, afterOpponentMove - beforeOpponentMove);
     const opponentErrored = ['Mistake', 'Blunder'].includes(previous.classification);
-    if (opponentErrored && current.expectedLoss >= 0.06 && ['Inaccuracy', 'Mistake'].includes(current.classification)) {
+    const meaningfulOpportunity = opportunityGain >= 0.10 || (opponentErrored && opportunityGain >= 0.06);
+
+    if (
+      meaningfulOpportunity
+      && current.expectedLoss >= 0.08
+      && ['Inaccuracy', 'Mistake'].includes(current.classification)
+    ) {
       current.classification = 'Miss';
       if (!current.tags.includes('Missed Tactic')) current.tags.push('Missed Tactic');
       current.explanation = explainMove({
@@ -198,8 +217,10 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
         san: current.san,
         bestMove: current.bestMove,
         fenBefore: current.fenBefore,
+        fenAfter: current.fenAfter,
         beforeCp: current.evalBefore,
         afterCp: current.evalAfter,
+        replyLine: analyses[i + 1].lines[0]?.pv || [],
       });
     }
   }

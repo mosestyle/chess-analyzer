@@ -198,19 +198,21 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
             {retry && <button className="ghost" onClick={() => { setRetry(false); setShowBest(true); }}>Hint / answer</button>}
           </div>
 
-          {settings.showEngineLines && (
-            <div className="engine-lines-panel">
-              <h3>Engine lines</h3>
-              {current.alternatives.map((line) => (
-                <div className="engine-line" key={line.multipv}>
-                  <strong>{line.multipv}. {formatEval(line.scoreCp, line.mate)}</strong>
-                  <span>{lineToSan(current.fenBefore, line.pv).join(' ')}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="review-engine-scroll" aria-label="Engine analysis">
+            {settings.showEngineLines && (
+              <div className="engine-lines-panel">
+                <h3>Engine lines</h3>
+                {current.alternatives.map((line) => (
+                  <div className="engine-line" key={line.multipv}>
+                    <strong>{line.multipv}. {formatEval(line.scoreCp, line.mate)}</strong>
+                    <span>{lineToSan(current.fenBefore, line.pv).join(' ')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {settings.showReviewGraph && <EvaluationGraph moves={review.moves} selected={safeIndex} onSelect={jump} />}
+          {settings.showReviewGraph && <div className="review-graph-slot"><EvaluationGraph moves={review.moves} selected={safeIndex} onSelect={jump} /></div>}
 
           <div className="prev-next">
             <button disabled={safeIndex === 0} onClick={() => jump(safeIndex - 1)}>← Previous</button>
