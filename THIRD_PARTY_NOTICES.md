@@ -25,3 +25,10 @@ pinned in `package.json`.
 
 This project uses chess.js for chess rules, move generation, FEN and PGN handling.
 See the package's own repository/license for its applicable terms.
+
+## Cburnett chess pieces
+
+The default chess piece artwork in `public/pieces/cburnett/` is the Cburnett
+Staunton-style set by Colin M. L. Burnett. The project uses this open-source
+piece set rather than copying Chess.com artwork. Keep the applicable upstream
+attribution/license information when redistributing the piece files.

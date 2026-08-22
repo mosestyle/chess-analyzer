@@ -1,5 +1,7 @@
 # Chess Analyzer V1
 
+**Current patch:** 0.1.1
+
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
 ## Included in this V1
@@ -31,6 +33,7 @@ A responsive, local-first chess analyzer built around Stockfish 18. The analyzer
 ### UI / platform
 - Responsive desktop, tablet and mobile layouts
 - Smooth board move animation
+- Open-source Cburnett Staunton SVG chess pieces
 - Synthesized move/capture/check/castle/promotion/game-end sounds
 - Sounds/animations can be turned off
 - Light/dark/system theme
@@ -69,6 +72,8 @@ A ready-made workflow is included at:
 `.github/workflows/deploy-pages.yml`
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
+
+If you are updating an existing 0.1.0 deployment, also see [`UPDATE_NOTES_0.1.1.md`](UPDATE_NOTES_0.1.1.md).
 
 ## Calibration warning
 

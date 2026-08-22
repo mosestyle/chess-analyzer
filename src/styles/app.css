@@ -115,9 +115,7 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
 .theme-blue .board-square.dark { background: #6f8fae; }
 .board-square.selected { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, .35); }
 .board-square.last { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, .26); }
-.piece { font-family: "DejaVu Sans", "Segoe UI Symbol", sans-serif; font-size: clamp(28px, 7vw, 66px); line-height: 1; position: relative; z-index: 4; cursor: grab; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
-.piece-w { color: #f7f7f4; text-shadow: 0 0 1px #111, 0 1px 1px #111; }
-.piece-b { color: #222733; text-shadow: 0 0 1px rgba(255,255,255,.2); }
+.piece { width: 88%; height: 88%; object-fit: contain; position: relative; z-index: 4; cursor: grab; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.22)); }
 .coord { position: absolute; z-index: 3; font-size: clamp(8px, 1.4vw, 12px); font-weight: 900; opacity: .68; pointer-events: none; }
 .coord.rank { left: 3px; top: 2px; }
 .coord.file { right: 3px; bottom: 1px; }
@@ -126,9 +124,10 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
 .board-arrows { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
 .board-arrows line { stroke: rgba(102, 187, 63, .86); stroke-width: .18; stroke-linecap: round; }
 .board-arrows marker path { fill: rgba(102, 187, 63, .9); }
-.ghost-piece { position: absolute; width: 12.5%; height: 12.5%; display: grid; place-items: center; z-index: 12; transition-property: transform; transition-timing-function: cubic-bezier(.2,.75,.2,1); pointer-events: none; }
+.ghost-piece { position: absolute; width: 12.5%; height: 12.5%; padding: .45%; object-fit: contain; z-index: 12; transition-property: transform; transition-timing-function: cubic-bezier(.2,.75,.2,1); pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 1px rgba(0,0,0,.22)); }
 .promotion-picker { position: absolute; z-index: 30; inset: 20% 14%; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 14px; align-content: center; }
-.promotion-picker button { border: 0; background: var(--surface-2); border-radius: 10px; font-size: 2.4rem; min-height: 64px; color: var(--text); }
+.promotion-picker button { border: 0; background: var(--surface-2); border-radius: 10px; min-height: 64px; color: var(--text); display: grid; place-items: center; }
+.promotion-picker button .piece { width: 52px; height: 52px; cursor: pointer; }
 .promotion-picker .promotion-cancel { grid-column: 1 / -1; font-size: .85rem; min-height: 38px; }
 .eval-bar { position: relative; overflow: hidden; flex: 0 0 34px; border-radius: 9px; background: #16191e; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
 .eval-bar.vertical { min-height: 100%; }
@@ -247,7 +246,6 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
   .review-side, .play-side { position: static; }
   .review-card { border-radius: 16px; }
   .summary-details { grid-template-columns: 1fr; }
-  .piece { font-size: clamp(28px, 9.2vw, 62px); }
 }
 
 @media (max-width: 560px) {
@@ -287,3 +285,46 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
 .phase-grid span { color: var(--muted); text-align: left; }
 .phase-grid strong, .phase-grid b { padding: 8px; border-radius: 9px; background: var(--surface-2); }
 @media (max-width: 560px) { .phase-card { border-left:0; border-right:0; border-radius:0; box-shadow:none; } }
+
+/* Review UX stabilization: keep the board and commentary usable without page-length scrolling. */
+.mobile-review-card { display: none; }
+.desktop-review-card { display: block; }
+.desktop-review-card .review-card { margin: 0 0 14px; box-shadow: none; border-radius: 16px; }
+.board-step-nav { display: none; grid-template-columns: 52px 1fr 52px; align-items: center; gap: 10px; padding: 8px 4px 2px; }
+.board-step-nav button { min-height: 46px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-2); color: var(--text); font-size: 1.5rem; line-height: 1; }
+.board-step-nav span { text-align: center; color: var(--muted); font-size: .8rem; font-weight: 800; }
+
+@media (min-width: 861px) {
+  .active-review .review-layout { grid-template-columns: minmax(360px, 1fr) minmax(330px, 430px); }
+  .active-review .review-board-column { display: flex; flex-direction: column; align-items: center; min-height: 0; }
+  .active-review .review-board-column .board-with-eval.large {
+    width: min(100%, 720px, calc(100dvh - 155px));
+    margin: 0 auto;
+  }
+  .active-review .review-side {
+    top: 82px;
+    max-height: calc(100dvh - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .active-review .move-strip { width: 100%; max-width: 720px; }
+}
+
+/* Phones and tablets get immediate previous/next controls directly below the board. */
+@media (max-width: 1024px) {
+  .board-step-nav { display: grid; width: 100%; }
+  .review-side .prev-next { display: none; }
+}
+
+@media (max-width: 860px) {
+  .mobile-review-card { display: block; }
+  .desktop-review-card { display: none; }
+  .active-review .review-board-column .board-with-eval.large { width: 100%; }
+  .board-step-nav { padding-inline: 10px; }
+}
+
+@media (max-width: 560px) {
+  .board-step-nav { padding-top: 10px; padding-bottom: 4px; }
+  .board-step-nav button { min-height: 44px; border-radius: 12px; }
+}

@@ -41,3 +41,10 @@ Then open the local URL printed by Vite.
 ## Why the engine files are not in the Git repository
 
 The Full NNUE WASM build is over 100 MB. Keeping it out of the repository avoids GitHub's normal source-file size limit. GitHub Actions downloads it as an npm dependency during the Pages build and places it into the deployment artifact.
+
+
+## Updating an existing deployment
+
+For a patch such as 0.1.1, upload/commit the new project contents over the existing repository and keep the same GitHub Pages settings. The included GitHub Actions workflow will rebuild and redeploy automatically.
+
+Because this patch changes the service-worker cache version, refresh the site once after the deployment finishes. If a browser still shows the old interface, close the installed PWA/tab and reopen it, or perform one hard refresh.

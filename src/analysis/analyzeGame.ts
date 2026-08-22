@@ -30,12 +30,12 @@ function terminalAnalysis(fen: string): EngineAnalysis | null {
   return { fen, depth: 0, bestMove: '(none)', lines: [], scoreCp, mate };
 }
 
-async function analyzePosition(fen: string, mode: EngineMode, quality: AnalysisQuality) {
+async function analyzePosition(fen: string, mode: EngineMode, quality: AnalysisQuality, multiPV = 1) {
   const terminal = terminalAnalysis(fen);
   if (terminal) return terminal;
   const preset = ANALYSIS_PRESETS[quality];
   const engine = await engineManager.get(mode);
-  return engine.analyze(fen, { depth: preset.depth, multiPV: preset.multiPV, hash: 32 });
+  return engine.analyze(fen, { depth: preset.reviewDepth, multiPV, hash: 24 });
 }
 
 
@@ -60,6 +60,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     };
   });
 
+  const sans = moves.map((move) => move.source.san);
   const positionFens = [startFen, ...moves.map((move) => move.fenAfter)];
   const analyses: EngineAnalysis[] = [];
   options.onProgress?.({ done: 0, total: positionFens.length, stage: 'Preparing game' });
@@ -85,10 +86,43 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       throw new DOMException('Analysis cancelled.', 'AbortError');
     }
     options.onProgress?.({ done: i, total: positionFens.length, stage: `Analyzing position ${i + 1} of ${positionFens.length}` });
-    analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality));
+    // First pass deliberately uses MultiPV 1. This is the biggest speed win for
+    // full-game review: every game can contain dozens of positions, while only
+    // a subset actually needs alternative lines to classify Great/Brilliant or
+    // explain an important error.
+    analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality, 1));
   }
 
-  const sans = moves.map((move) => move.source.san);
+  // Second pass: enrich only positions where alternatives materially improve
+  // the review. Best-move candidates need a second line for Great/Brilliant/
+  // Only Move detection, and sizeable errors benefit from an alternative line.
+  // This keeps the review much faster than running MultiPV 2-3 on every ply.
+  const preset = ANALYSIS_PRESETS[options.quality];
+  if (preset.reviewMultiPV > 1) {
+    const detailCandidates: number[] = [];
+    for (let i = 0; i < moves.length; i++) {
+      const color = moves[i].source.color as 'w' | 'b';
+      const loss = expectedLoss(analyses[i].scoreCp, analyses[i + 1].scoreCp, color);
+      const isBestCandidate = moves[i].uci === analyses[i].bestMove && !(i < 18 && isLikelyBookMove(sans, i));
+      const isImportantError = loss >= 0.075;
+      if (isBestCandidate || isImportantError) detailCandidates.push(i);
+    }
+
+    for (let n = 0; n < detailCandidates.length; n++) {
+      if (options.signal?.aborted) {
+        await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
+        throw new DOMException('Analysis cancelled.', 'AbortError');
+      }
+      const i = detailCandidates[n];
+      options.onProgress?.({
+        done: positionFens.length - 1,
+        total: positionFens.length,
+        stage: `Refining important move ${n + 1} of ${detailCandidates.length}`,
+      });
+      analyses[i] = await analyzePosition(positionFens[i], activeMode, options.quality, preset.reviewMultiPV);
+    }
+  }
+
   const reviewMoves: ReviewMove[] = moves.map((move, index) => {
     const before = analyses[index];
     const after = analyses[index + 1];

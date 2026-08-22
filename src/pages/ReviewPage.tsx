@@ -10,20 +10,24 @@ import { phaseAccuracies } from '../analysis/accuracy';
 import type { Classification, GameReview, Settings } from '../types';
 
 const ORDER: Classification[] = ['Brilliant', 'Great', 'Best', 'Excellent', 'Good', 'Book', 'Inaccuracy', 'Mistake', 'Miss', 'Blunder'];
+type ReviewView = 'summary' | 'review';
 
-export function ReviewPage({ review, settings, onBack, onSettings }: {
+export function ReviewPage({ review, settings, view, onViewChange, index, onIndexChange, onBack, onSettings }: {
   review: GameReview;
   settings: Settings;
+  view: ReviewView;
+  onViewChange: (view: ReviewView) => void;
+  index: number;
+  onIndexChange: (index: number) => void;
   onBack: () => void;
   onSettings: () => void;
 }) {
-  const [screen, setScreen] = useState<'summary' | 'review'>('summary');
-  const [index, setIndex] = useState(0);
   const [showBest, setShowBest] = useState(false);
   const [retry, setRetry] = useState(false);
   const [retryMessage, setRetryMessage] = useState('');
 
-  const current = review.moves[index];
+  const safeIndex = Math.max(0, Math.min(review.moves.length - 1, index));
+  const current = review.moves[safeIndex];
   const whitePhases = useMemo(() => phaseAccuracies(review.moves, 'w'), [review.moves]);
   const blackPhases = useMemo(() => phaseAccuracies(review.moves, 'b'), [review.moves]);
   const arrow = showBest && current.bestMove && current.bestMove !== '(none)'
@@ -36,7 +40,7 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
 
   function jump(next: number) {
     const safe = Math.max(0, Math.min(review.moves.length - 1, next));
-    setIndex(safe);
+    onIndexChange(safe);
     setShowBest(false);
     setRetry(false);
     setRetryMessage('');
@@ -61,7 +65,23 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
     return false;
   }
 
-  if (screen === 'summary') {
+  const reviewCard = (
+    <div className="review-card panel">
+      <div className="review-card-head">
+        <ClassificationBadge value={current.classification} />
+        <span className="move-title">{current.moveNumber}{current.color === 'b' ? '…' : '.'} {current.san}</span>
+        <span className="eval-chip">{formatEval(current.evalAfter)}</span>
+      </div>
+      {settings.showCriticalMoments && current.tags.length > 0 && (
+        <div className="tag-row">{current.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+      )}
+      <p>{current.explanation}</p>
+      {showBest && <p className="best-copy"><strong>Best:</strong> {bestSan} · {lineToSan(current.fenBefore, current.bestLine).join(' ')}</p>}
+      {retry && <div className="retry-banner"><strong>Retry:</strong> Find the best move.{retryMessage && <span>{retryMessage}</span>}</div>}
+    </div>
+  );
+
+  if (view === 'summary') {
     return (
       <main className="page review-page">
         <AppHeader title="Game Review" onBack={onBack} right={<button className="icon-button" onClick={onSettings}>⚙</button>} />
@@ -69,7 +89,7 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
           <p className="eyebrow">ANALYSIS COMPLETE</p>
           <h2>{review.whiteName} vs {review.blackName}</h2>
           <p>{review.opening}</p>
-          <EvaluationGraph moves={review.moves} onSelect={(i) => { setIndex(i); setScreen('review'); }} />
+          <EvaluationGraph moves={review.moves} onSelect={(i) => { onIndexChange(i); onViewChange('review'); }} />
         </section>
 
         <section className="panel score-card">
@@ -105,30 +125,18 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
           </div>
         </section>
 
-        <button className="primary full-width sticky-action" onClick={() => setScreen('review')}>Start review</button>
+        <button className="primary full-width sticky-action" onClick={() => onViewChange('review')}>Start review</button>
       </main>
     );
   }
 
   return (
-    <main className="page review-page">
-      <AppHeader title="Game Review" onBack={() => setScreen('summary')} right={<button className="icon-button" onClick={onSettings}>⚙</button>} />
+    <main className="page review-page active-review">
+      <AppHeader title="Game Review" onBack={() => onViewChange('summary')} right={<button className="icon-button" onClick={onSettings}>⚙</button>} />
 
       <div className="review-layout">
         <section className="review-board-column">
-          <div className="review-card panel">
-            <div className="review-card-head">
-              <ClassificationBadge value={current.classification} />
-              <span className="move-title">{current.moveNumber}{current.color === 'b' ? '…' : '.'} {current.san}</span>
-              <span className="eval-chip">{formatEval(current.evalAfter)}</span>
-            </div>
-            {settings.showCriticalMoments && current.tags.length > 0 && (
-              <div className="tag-row">{current.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-            )}
-            <p>{current.explanation}</p>
-            {showBest && <p className="best-copy"><strong>Best:</strong> {bestSan} · {lineToSan(current.fenBefore, current.bestLine).join(' ')}</p>}
-            {retry && <div className="retry-banner"><strong>Retry:</strong> Find the best move.{retryMessage && <span>{retryMessage}</span>}</div>}
-          </div>
+          <div className="mobile-review-card">{reviewCard}</div>
 
           <div className="board-with-eval large">
             {settings.showEvaluation && <EvaluationBar cp={showBest ? current.evalBefore : current.evalAfter} />}
@@ -142,15 +150,23 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
             />
           </div>
 
-          <div className="move-strip" aria-label="Move navigation">
-            {review.moves.slice(Math.max(0, index - 3), Math.min(review.moves.length, index + 4)).map((move) => {
+          <div className="board-step-nav" aria-label="Move navigation">
+            <button aria-label="Previous move" disabled={safeIndex === 0} onClick={() => jump(safeIndex - 1)}>←</button>
+            <span>{safeIndex + 1} / {review.moves.length}</span>
+            <button aria-label="Next move" disabled={safeIndex === review.moves.length - 1} onClick={() => jump(safeIndex + 1)}>→</button>
+          </div>
+
+          <div className="move-strip" aria-label="Move list">
+            {review.moves.slice(Math.max(0, safeIndex - 3), Math.min(review.moves.length, safeIndex + 4)).map((move) => {
               const moveIndex = move.ply - 1;
-              return <button key={move.ply} className={moveIndex === index ? 'active' : ''} onClick={() => jump(moveIndex)}>{move.moveNumber}{move.color === 'b' ? '…' : '.'}{move.san}</button>;
+              return <button key={move.ply} className={moveIndex === safeIndex ? 'active' : ''} onClick={() => jump(moveIndex)}>{move.moveNumber}{move.color === 'b' ? '…' : '.'}{move.san}</button>;
             })}
           </div>
         </section>
 
         <aside className="review-side panel">
+          <div className="desktop-review-card">{reviewCard}</div>
+
           <div className="review-actions">
             <button className="secondary" onClick={() => { setRetry(false); setShowBest((v) => !v); }}>{showBest ? 'Show played' : 'Show best'}</button>
             <button className="secondary" onClick={() => { setShowBest(false); setRetry(true); setRetryMessage(''); }}>Retry</button>
@@ -169,12 +185,12 @@ export function ReviewPage({ review, settings, onBack, onSettings }: {
             </div>
           )}
 
-          <EvaluationGraph moves={review.moves} selected={index} onSelect={jump} />
+          <EvaluationGraph moves={review.moves} selected={safeIndex} onSelect={jump} />
 
           <div className="prev-next">
-            <button disabled={index === 0} onClick={() => jump(index - 1)}>← Previous</button>
-            <span>{index + 1} / {review.moves.length}</span>
-            <button disabled={index === review.moves.length - 1} onClick={() => jump(index + 1)}>Next →</button>
+            <button disabled={safeIndex === 0} onClick={() => jump(safeIndex - 1)}>← Previous</button>
+            <span>{safeIndex + 1} / {review.moves.length}</span>
+            <button disabled={safeIndex === review.moves.length - 1} onClick={() => jump(safeIndex + 1)}>Next →</button>
           </div>
         </aside>
       </div>

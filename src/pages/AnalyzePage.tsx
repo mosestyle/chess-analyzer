@@ -53,7 +53,7 @@ export function AnalyzePage({ settings, setSettings, onBack, onReview }: {
           if (settings.engineMode === 'full' && settings.autoFallbackLite) engine = await engineManager.switch('lite');
           else throw e;
         }
-        const result = await engine.analyze(chess.fen(), { depth: preset.depth, multiPV: preset.multiPV, hash: 32 });
+        const result = await engine.analyze(chess.fen(), { depth: preset.positionDepth, multiPV: preset.positionMultiPV, hash: 24 });
         setFenResult({ fen: chess.fen(), analysis: result });
       } else {
         const abort = new AbortController();

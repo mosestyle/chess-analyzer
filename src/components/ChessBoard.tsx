@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ImgHTMLAttributes } from 'react';
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js';
 import type { Settings } from '../types';
 
 const FILES = 'abcdefgh';
-const PIECES: Record<Color, Record<PieceSymbol, string>> = {
-  w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+const PIECE_FILE: Record<Color, Record<PieceSymbol, string>> = {
+  w: { k: 'wK.svg', q: 'wQ.svg', r: 'wR.svg', b: 'wB.svg', n: 'wN.svg', p: 'wP.svg' },
+  b: { k: 'bK.svg', q: 'bQ.svg', r: 'bR.svg', b: 'bB.svg', n: 'bN.svg', p: 'bP.svg' },
 };
 
 export interface BoardMove {
@@ -42,8 +42,29 @@ function xyToSquare(x: number, y: number, orientation: 'white' | 'black') {
 function animationMs(settings: Settings) {
   if (!settings.animations) return 0;
   if (settings.animationSpeed === 'fast') return 130;
-  if (settings.animationSpeed === 'relaxed') return 280;
-  return 190;
+  if (settings.animationSpeed === 'relaxed') return 300;
+  return 205;
+}
+
+function pieceUrl(color: Color, type: PieceSymbol) {
+  const base = new URL(import.meta.env.BASE_URL || './', window.location.href);
+  return new URL(`pieces/cburnett/${PIECE_FILE[color][type]}`, base).href;
+}
+
+function PieceImage({ color, type, className = '', ...props }: {
+  color: Color;
+  type: PieceSymbol;
+  className?: string;
+} & ImgHTMLAttributes<HTMLImageElement>) {
+  return (
+    <img
+      {...props}
+      src={pieceUrl(color, type)}
+      alt=""
+      draggable={false}
+      className={`piece ${className}`.trim()}
+    />
+  );
 }
 
 export function ChessBoard({ fen, settings, orientation = 'white', interactive = false, onMove, lastMove, arrow, disabled }: Props) {
@@ -52,7 +73,7 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
   const [selected, setSelected] = useState<Square | null>(null);
   const [dragFrom, setDragFrom] = useState<Square | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square; color: Color } | null>(null);
-  const [ghost, setGhost] = useState<{ from: string; to: string; piece: string; color: Color } | null>(null);
+  const [ghost, setGhost] = useState<{ from: string; to: string; type: PieceSymbol; color: Color } | null>(null);
   const [ghostEnd, setGhostEnd] = useState(false);
 
   const legalTargets = useMemo(() => {
@@ -66,17 +87,30 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
 
   useEffect(() => {
     setSelected(null);
-    if (!lastMove || !settings.animations) return;
+    if (!lastMove || !settings.animations) {
+      setGhost(null);
+      return;
+    }
+
     try {
       const after = new Chess(fen);
       const piece = after.get(lastMove.to as Square);
       if (!piece) return;
-      setGhost({ from: lastMove.from, to: lastMove.to, piece: PIECES[piece.color][piece.type], color: piece.color });
+
+      setGhost({ from: lastMove.from, to: lastMove.to, type: piece.type, color: piece.color });
       setGhostEnd(false);
-      const raf = requestAnimationFrame(() => setGhostEnd(true));
-      const timer = window.setTimeout(() => setGhost(null), animationMs(settings) + 30);
+
+      // Two frames guarantee the browser paints the starting square before
+      // applying the transform. A single RAF can be batched by React and look
+      // like an instant teleport on mobile browsers.
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setGhostEnd(true));
+      });
+      const timer = window.setTimeout(() => setGhost(null), animationMs(settings) + 90);
       return () => {
-        cancelAnimationFrame(raf);
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
         window.clearTimeout(timer);
       };
     } catch {
@@ -153,8 +187,10 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
               {settings.showCoordinates && y === 7 && <span className="coord file">{square[0]}</span>}
               {settings.showLegalMoves && legalTargets.has(square) && <span className={`legal-dot ${piece ? 'capture' : ''}`} />}
               {piece && !hideForGhost && (
-                <span
-                  className={`piece piece-${piece.color}`}
+                <PieceImage
+                  color={piece.color}
+                  type={piece.type}
+                  onDragStart={(event) => event.preventDefault()}
                   onPointerDown={(event) => {
                     if (!interactive || disabled || piece.color !== chess.turn()) return;
                     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -168,7 +204,7 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
                     setDragFrom(null);
                     if (target) void tryMove(from, target);
                   }}
-                >{PIECES[piece.color][piece.type]}</span>
+                />
               )}
             </button>
           );
@@ -192,15 +228,17 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
         )}
 
         {ghost && ghostFrom && ghostTo && (
-          <span
-            className={`piece piece-${ghost.color} ghost-piece`}
+          <PieceImage
+            color={ghost.color}
+            type={ghost.type}
+            className="ghost-piece"
             style={{
               left: 0,
               top: 0,
               transform: `translate(${(ghostEnd ? ghostTo.x : ghostFrom.x) * 100}%, ${(ghostEnd ? ghostTo.y : ghostFrom.y) * 100}%)`,
               transitionDuration: `${animationMs(settings)}ms`,
             }}
-          >{ghost.piece}</span>
+          />
         )}
 
         {promotion && (
@@ -210,7 +248,7 @@ export function ChessBoard({ fen, settings, orientation = 'white', interactive =
                 const pending = promotion;
                 setPromotion(null);
                 void tryMove(pending.from, pending.to, piece);
-              }}>{PIECES[promotion.color][piece]}</button>
+              }}><PieceImage color={promotion.color} type={piece} /></button>
             ))}
             <button className="promotion-cancel" onClick={() => setPromotion(null)}>Cancel</button>
           </div>

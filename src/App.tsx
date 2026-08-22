@@ -9,11 +9,14 @@ import { loadSettings, saveSettings } from './settings';
 import type { GameReview, Settings } from './types';
 
 type Screen = 'home' | 'analyze' | 'review' | 'play' | 'settings' | 'about';
+type ReviewView = 'summary' | 'review';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [settings, setSettingsState] = useState<Settings>(() => loadSettings());
   const [review, setReview] = useState<GameReview | null>(null);
+  const [reviewView, setReviewView] = useState<ReviewView>('summary');
+  const [reviewIndex, setReviewIndex] = useState(0);
   const [settingsReturn, setSettingsReturn] = useState<Screen>('home');
 
   const setSettings = (next: Settings) => {
@@ -40,6 +43,8 @@ export default function App() {
 
   function receiveReview(next: GameReview) {
     setReview(next);
+    setReviewView('summary');
+    setReviewIndex(0);
     setScreen('review');
   }
 
@@ -55,7 +60,18 @@ export default function App() {
         />
       )}
       {screen === 'analyze' && <AnalyzePage settings={settings} setSettings={setSettings} onBack={() => setScreen('home')} onReview={receiveReview} />}
-      {screen === 'review' && review && <ReviewPage review={review} settings={settings} onBack={() => setScreen('home')} onSettings={() => openSettings('review')} />}
+      {screen === 'review' && review && (
+        <ReviewPage
+          review={review}
+          settings={settings}
+          view={reviewView}
+          onViewChange={setReviewView}
+          index={reviewIndex}
+          onIndexChange={setReviewIndex}
+          onBack={() => setScreen('home')}
+          onSettings={() => openSettings('review')}
+        />
+      )}
       {screen === 'play' && <PlayPage settings={settings} setSettings={setSettings} onBack={() => setScreen('home')} onReview={receiveReview} />}
       {screen === 'settings' && <SettingsPage settings={settings} setSettings={setSettings} onBack={() => setScreen(settingsReturn)} />}
       {screen === 'about' && <AboutPage onBack={() => setScreen('home')} />}
