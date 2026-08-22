@@ -8,12 +8,14 @@ export interface AnalysisPreset {
   /** Fast first pass for a full-game review. */
   reviewDepth: number;
   reviewMultiPV: number;
-  /** Selective second-pass depth for ambiguous/critical moves. */
-  reviewVerifyDepth: number;
-  /** Hard cap on deeper verification positions so Standard stays thermally reasonable. */
+  /** Optional short second-pass search budget for genuinely special positions. */
+  reviewVerifyMovetimeMs: number;
+  /** Hard cap on extra verification positions. */
   reviewVerifyLimit: number;
-  /** Small idle gap between deeper searches to avoid sustained CPU saturation. */
+  /** Small idle gap between bounded verification searches. */
   reviewVerifyPauseMs: number;
+  /** Deep/Maximum may spend extra work around ordinary error boundaries. */
+  reviewVerifyErrors: boolean;
 }
 
 export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
@@ -23,9 +25,10 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 2,
     reviewDepth: 9,
     reviewMultiPV: 2,
-    reviewVerifyDepth: 11,
-    reviewVerifyLimit: 4,
-    reviewVerifyPauseMs: 100,
+    reviewVerifyMovetimeMs: 0,
+    reviewVerifyLimit: 0,
+    reviewVerifyPauseMs: 0,
+    reviewVerifyErrors: false,
   },
   standard: {
     label: 'Standard',
@@ -33,9 +36,12 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 12,
     reviewMultiPV: 2,
-    reviewVerifyDepth: 15,
-    reviewVerifyLimit: 10,
-    reviewVerifyPauseMs: 160,
+    // Standard should feel close to the fast/cool V0.2.0 path. A maximum of two
+    // short time-bounded checks replaces the former ten depth-15 searches.
+    reviewVerifyMovetimeMs: 180,
+    reviewVerifyLimit: 2,
+    reviewVerifyPauseMs: 60,
+    reviewVerifyErrors: false,
   },
   deep: {
     label: 'Deep',
@@ -43,9 +49,10 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 15,
     reviewMultiPV: 2,
-    reviewVerifyDepth: 18,
-    reviewVerifyLimit: 14,
-    reviewVerifyPauseMs: 90,
+    reviewVerifyMovetimeMs: 450,
+    reviewVerifyLimit: 6,
+    reviewVerifyPauseMs: 80,
+    reviewVerifyErrors: true,
   },
   maximum: {
     label: 'Maximum',
@@ -53,8 +60,9 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 19,
     reviewMultiPV: 3,
-    reviewVerifyDepth: 21,
-    reviewVerifyLimit: 20,
-    reviewVerifyPauseMs: 40,
+    reviewVerifyMovetimeMs: 900,
+    reviewVerifyLimit: 10,
+    reviewVerifyPauseMs: 50,
+    reviewVerifyErrors: true,
   },
 };

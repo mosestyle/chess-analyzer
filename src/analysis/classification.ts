@@ -4,7 +4,7 @@ import { movedPieceIsEnPrise } from '../chess/helpers';
 const DEFAULT_RATING = 1200;
 
 /**
- * V0.2.1 calibration model.
+ * V0.2.3 calibration model.
  *
  * Engine evaluation is converted to expected score with a rating-aware curve.
  * Lower-rated games use a slightly flatter curve because small engine edges are
@@ -43,6 +43,14 @@ function mateForColor(mate: number | undefined, color: 'w' | 'b') {
   return color === 'w' ? mate : -mate;
 }
 
+/** Human-facing expected-loss bands used after Best/Book/special handling. */
+export const CLASSIFICATION_BANDS = {
+  excellent: 0.012,
+  good: 0.055,
+  inaccuracy: 0.105,
+  mistake: 0.20,
+} as const;
+
 export function classifyMove(args: {
   loss: number;
   actualUci: string;
@@ -64,23 +72,30 @@ export function classifyMove(args: {
     piece, captured, legalCount, beforeCp, afterCp, rating = DEFAULT_RATING,
   } = args;
 
-  // Book is an opening-theory label, not an engine-quality bucket. Once the
-  // local opening path recognizes the move, keep the Book label even if the
-  // engine slightly prefers another continuation.
   if (isBook) return 'Book';
 
-  const isBest = actualUci === bestUci;
+  const exactEngineChoice = actualUci === bestUci;
   const cpDrift = Math.abs(beforeCp - afterCp);
+  const gap = lineGap(lines, color, rating);
 
-  // At practical search depths several moves can be essentially equivalent.
-  // Treat a numerically indistinguishable move as Best rather than flooding the
-  // review with Excellent labels just because Stockfish returned another first
-  // PV at that exact depth.
-  const equivalentBest = !isBest && loss <= 0.0035 && cpDrift <= 18;
-  if (isBest || equivalentBest) {
+  // V0.2.2 over-counted Best because any move matching the shallow first-PV
+  // bestmove was automatically promoted to Best. At review depth 12 that can be
+  // unstable. In V0.2.3 an exact first-PV move still has to preserve essentially
+  // all expected score. Forced moves remain Best regardless.
+  const confirmedBest = exactEngineChoice && (legalCount <= 1 || loss <= 0.006);
+
+  // Equivalent alternatives may also be called Best, but only with very strong
+  // evidence that they are practically indistinguishable. Requiring MultiPV
+  // avoids promoting arbitrary shallow alternatives when only one line exists.
+  const equivalentBest = !exactEngineChoice
+    && lines.length >= 2
+    && loss <= 0.0015
+    && cpDrift <= 8
+    && gap <= 0.012;
+
+  if (confirmedBest || equivalentBest) {
     if (legalCount <= 1) return 'Best';
 
-    const gap = lineGap(lines, color, rating);
     const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const movedValue = values[piece] || 0;
     const capturedValue = captured ? values[captured] || 0 : 0;
@@ -91,38 +106,35 @@ export function classifyMove(args: {
     const beforeExpected = moverExpectedScore(beforeCp, color, rating);
     const afterExpected = moverExpectedScore(afterCp, color, rating);
 
-    // Brilliant stays deliberately rare. In addition to being effectively the
-    // best move, it must accept a real material risk and have a clear uniqueness
-    // signal from the engine.
     if (
-      isBest
+      exactEngineChoice
       && sacrificeLike
-      && gap >= 0.10
+      && lines.length >= 2
+      && gap >= 0.11
       && loss <= 0.004
       && beforeExpected <= 0.90
       && afterExpected >= Math.max(0.50, beforeExpected - 0.008)
     ) return 'Brilliant';
 
-    // Great requires a genuinely important unique best move in a position where
-    // the result is still meaningfully in play. This avoids awarding Great for
-    // routine conversions in positions that are already completely decided.
     if (
-      isBest
-      && gap >= 0.16
-      && beforeExpected >= 0.15
-      && beforeExpected <= 0.85
+      exactEngineChoice
+      && lines.length >= 2
+      && gap >= 0.18
+      && beforeExpected >= 0.16
+      && beforeExpected <= 0.84
     ) return 'Great';
 
     return 'Best';
   }
 
-  // Expected-points loss bands intentionally follow the intuitive V2-style
-  // ladder used by the product spec. The rating-aware expected score and deeper
-  // verification pass are what make these bands more stable in V0.2.1.
-  if (loss <= 0.02) return 'Excellent';
-  if (loss <= 0.05) return 'Good';
-  if (loss <= 0.10) return 'Inaccuracy';
-  if (loss <= 0.20) return 'Mistake';
+  // A shallow engine choice that drifts materially when the resulting position
+  // is searched should be allowed to fall into the normal quality ladder. This
+  // is the main V0.2.3 correction for Best inflation without adding expensive
+  // deep searches to every position.
+  if (loss <= CLASSIFICATION_BANDS.excellent) return 'Excellent';
+  if (loss <= CLASSIFICATION_BANDS.good) return 'Good';
+  if (loss <= CLASSIFICATION_BANDS.inaccuracy) return 'Inaccuracy';
+  if (loss <= CLASSIFICATION_BANDS.mistake) return 'Mistake';
   return 'Blunder';
 }
 
@@ -145,14 +157,14 @@ export function specialTags(args: {
   const after = moverExpectedScore(args.afterCp, args.color, rating);
   const gap = lineGap(args.lines, args.color, rating);
 
-  const crossedResultBoundary = (before >= 0.68 && after <= 0.50)
-    || (before >= 0.52 && after <= 0.34);
-  if (args.loss >= 0.085 || crossedResultBoundary || gap >= 0.18) tags.push('Critical Moment');
-  if (args.loss >= 0.19 || (before >= 0.76 && after <= 0.38)) tags.push('Major Turning Point');
-  if (gap >= 0.20 && args.actualUci === args.bestUci && before >= 0.15 && before <= 0.85) tags.push('Only Move');
+  const crossedResultBoundary = (before >= 0.72 && after <= 0.48)
+    || (before >= 0.56 && after <= 0.30);
+  if (args.loss >= 0.13 || crossedResultBoundary || gap >= 0.22) tags.push('Critical Moment');
+  if (args.loss >= 0.20 || (before >= 0.80 && after <= 0.34)) tags.push('Major Turning Point');
+  if (gap >= 0.22 && args.actualUci === args.bestUci && before >= 0.16 && before <= 0.84) tags.push('Only Move');
   if (args.classification === 'Brilliant') tags.push('Winning Sacrifice');
 
-  if (before >= 0.78 && after < 0.58 && args.loss >= 0.12) tags.push('Missed Win');
+  if (before >= 0.80 && after < 0.55 && args.loss >= 0.13) tags.push('Missed Win');
 
   const mateBefore = mateForColor(args.beforeMate ?? args.lines[0]?.mate, args.color);
   const mateAfter = mateForColor(args.afterMate, args.color);

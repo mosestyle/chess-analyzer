@@ -1,6 +1,6 @@
-# Chess Analyzer V0.2.2
+# Chess Analyzer V0.2.3
 
-**Current release:** 0.2.2
+**Current release:** 0.2.3
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.2.md`](UPDATE_NOTES_0.2.2.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.3.md`](UPDATE_NOTES_0.2.3.md).
 
 ## Calibration warning
 
@@ -88,9 +88,9 @@ Application source: MIT (see `LICENSE`).
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
 
 
-## 0.2.2 thermal-friendly verification
+## 0.2.3 calibration + cool Standard
 
-Version 0.2.2 keeps the V0.2.1 rating-aware calibration but fixes the sustained CPU spike during the second-pass verifier. Standard now verifies only the most consequential positions, caps deeper rechecks, lowers verification depth from 17 to 15, avoids re-searching routine Best moves, uses MultiPV only where it can change a special/threshold decision, and inserts a short idle gap between verification searches. Full NNUE remains the default engine. See `UPDATE_NOTES_0.2.2.md`.
+Version 0.2.3 uses the completed five-game Full NNUE/Standard calibration set. It reduces Best inflation, makes Miss substantially stricter, restores more Good/Mistake labels, caps/ranks Critical Moments, and redesigns Standard verification so it no longer performs ten extra depth-15 searches on nearly every game. Standard now allows at most two short ~180 ms special-position checks. Full NNUE remains the default engine. See `UPDATE_NOTES_0.2.3.md`.
 
 ## 0.2.1 calibrated analyzer
 

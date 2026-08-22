@@ -8,10 +8,10 @@ async function text(path) {
   return readFile(new URL(path, root), 'utf8');
 }
 
-test('package declares Stockfish 18 and V0.2.2', async () => {
+test('package declares Stockfish 18 and V0.2.3', async () => {
   const pkg = JSON.parse(await text('package.json'));
   assert.equal(pkg.dependencies.stockfish, '18.0.8');
-  assert.equal(pkg.version, '0.2.2');
+  assert.equal(pkg.version, '0.2.3');
 });
 
 test('desktop review keeps engine scroll and anchored navigation', async () => {
@@ -24,26 +24,48 @@ test('desktop review keeps engine scroll and anchored navigation', async () => {
   assert.match(css, /\.active-review \.review-side \.prev-next[\s\S]*grid-area: nav/);
 });
 
-test('V0.2.2 keeps rating-aware expected score and thermal-friendly verification', async () => {
-  const classification = await text('src/analysis/classification.ts');
+test('V0.2.3 Standard uses a tiny time-bounded verifier instead of 10 deep searches', async () => {
   const analyzer = await text('src/analysis/analyzeGame.ts');
   const presets = await text('src/engine/presets.ts');
-  assert.match(classification, /ratingScale/);
-  assert.match(classification, /rating = DEFAULT_RATING/);
-  assert.match(analyzer, /WhiteElo/);
-  assert.match(analyzer, /BlackElo/);
-  assert.match(analyzer, /nearClassificationBoundary/);
-  assert.match(analyzer, /specialBestCandidate/);
-  assert.match(analyzer, /slice\(0, preset\.reviewVerifyLimit\)/);
-  assert.match(analyzer, /await coolDown\(preset\.reviewVerifyPauseMs\)/);
-  assert.match(analyzer, /hash: 16/);
-  assert.match(presets, /reviewVerifyDepth: 15/);
-  assert.match(presets, /reviewVerifyLimit: 10/);
-  assert.match(presets, /reviewVerifyPauseMs: 160/);
+  assert.match(analyzer, /reviewVerifyMovetimeMs/);
+  assert.match(analyzer, /Checking critical position/);
+  assert.match(analyzer, /preset\.reviewVerifyErrors/);
+  assert.doesNotMatch(analyzer, /reviewVerifyDepth/);
+  assert.match(presets, /reviewVerifyMovetimeMs: 180/);
+  assert.match(presets, /reviewVerifyLimit: 2/);
+  assert.match(presets, /reviewVerifyErrors: false/);
+  assert.match(presets, /quick:[\s\S]*reviewVerifyLimit: 0/);
 });
 
-test('V0.2.1 calibrated accuracy model remains in V0.2.2', async () => {
+test('V0.2.3 classification reduces Best inflation and narrows Excellent', async () => {
+  const classification = await text('src/analysis/classification.ts');
+  assert.match(classification, /confirmedBest/);
+  assert.match(classification, /loss <= 0\.006/);
+  assert.match(classification, /excellent: 0\.012/);
+  assert.match(classification, /good: 0\.055/);
+  assert.match(classification, /lines\.length >= 2/);
+});
+
+test('V0.2.3 Miss requires a previous real error and never steals Blunders', async () => {
+  const analyzer = await text('src/analysis/analyzeGame.ts');
+  assert.match(analyzer, /previousWasRealError/);
+  assert.match(analyzer, /opportunityGain >= 0\.085/);
+  assert.match(analyzer, /\['Inaccuracy', 'Mistake'\]\.includes\(current\.classification\)/);
+  assert.doesNotMatch(analyzer, /\['Inaccuracy', 'Mistake', 'Blunder'\]\.includes\(current\.classification\)/);
+});
+
+test('Critical Moments are ranked and capped by game length', async () => {
+  const analyzer = await text('src/analysis/analyzeGame.ts');
+  assert.match(analyzer, /function trimCriticalMoments/);
+  assert.match(analyzer, /Math\.ceil\(moves\.length \/ 12\)/);
+  assert.match(analyzer, /trimCriticalMoments\(reviewMoves\)/);
+});
+
+test('rating-aware expected score and calibrated accuracy remain enabled', async () => {
+  const classification = await text('src/analysis/classification.ts');
   const accuracy = await text('src/analysis/accuracy.ts');
+  assert.match(classification, /ratingScale/);
+  assert.match(classification, /rating = DEFAULT_RATING/);
   assert.match(accuracy, /CLASS_CAP/);
   assert.match(accuracy, /Math\.log/);
   assert.match(accuracy, /geometric \* 0\.68/);

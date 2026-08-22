@@ -1,14 +1,8 @@
-# Analysis specification — V0.2.2
+# Analysis specification — V0.2.3
 
 For a PGN, reconstruct every position from the starting FEN. Stockfish scores are normalized to White in the engine layer, while classification and expected-score loss are evaluated from the mover's perspective.
 
-PGN metadata used by V0.2.2 includes:
-
-- White / Black names
-- WhiteElo / BlackElo when present
-- ECO
-- Opening / Variation when present
-- ECOUrl when present
+PGN metadata includes White/Black names, ratings when present, ECO, Opening/Variation, and ECOUrl.
 
 ## Expected loss
 
@@ -18,76 +12,72 @@ For White:
 
 For Black, expected score is inverted and Black's rating is used.
 
-The expected-score function saturates in already-decided positions, helping avoid treating every large raw centipawn swing as equally severe.
+The expected-score function saturates in already-decided positions so raw centipawn swings do not all receive the same practical severity.
 
-## Two-stage review
-
-### Pass 1 — fast scan
+## Primary review pass
 
 Every position is analyzed with MultiPV 1 at the selected review depth.
 
-Standard uses depth 12 for this pass.
+- Quick: depth 9
+- Standard: depth 12
+- Deep: depth 15
+- Maximum: depth 19
 
-### Pass 2 — thermal-friendly selective verification
+## Bounded optional verification
 
-V0.2.2 keeps deeper verification, but no longer deeply rechecks every routine Best move or every broad tactical heuristic.
+V0.2.3 removes the V0.2.2 Standard pattern where almost every game hit ten extra depth-15 searches.
 
-Standard:
+### Quick
 
-- verification depth 15
-- maximum 10 deeper verification positions per game
-- 160 ms idle gap between verification searches
-- MultiPV 2 only where alternative-line information can change a boundary/special-move decision
+- no extra verification
 
-Verification priority is highest for:
+### Standard
 
-- mate transitions
-- large expected-score errors
-- moves close to classification boundaries
-- meaningful practical/evaluation swings
-- plausible Great / Brilliant / Only-Move candidates
+- maximum 2 extra checks
+- ~180 ms search budget per check
+- only mate ambiguity and plausible special-best (Great/Brilliant/Only Move) candidates
+- ordinary error boundaries are finalized from the primary pass
 
-Routine Best moves are kept from the first pass unless they have a special uniqueness/tactical signal.
+### Deep
 
-This deliberately trades a small amount of second-pass depth for much lower sustained CPU use on Full NNUE while preserving the V0.2.1 rating-aware classification model.
+- maximum 6 extra checks
+- ~450 ms each
+- can also recheck important errors / classification boundaries
 
-## Quality preset verification budgets
+### Maximum
 
-- Quick: verify depth 11, max 4 positions, 100 ms idle gap
-- Standard: verify depth 15, max 10 positions, 160 ms idle gap
-- Deep: verify depth 18, max 14 positions, 90 ms idle gap
-- Maximum: verify depth 21, max 20 positions, 40 ms idle gap
+- maximum 10 extra checks
+- ~900 ms each
+- broader error/boundary verification
 
-Deep and Maximum are intentionally more CPU intensive.
+Time-bounded searches are used so CPU load is predictable. Deep and Maximum are intentionally heavier; Standard is designed for everyday desktop/mobile use.
+
+## Classification calibration
+
+Book is handled first. Best now requires a stable result rather than only a shallow `bestmove` match. The normal expected-loss bands are:
+
+- Excellent <= 0.012
+- Good <= 0.055
+- Inaccuracy <= 0.105
+- Mistake <= 0.20
+- Blunder > 0.20
+
+Great and Brilliant require stronger uniqueness/tactical evidence and MultiPV information.
+
+## Miss
+
+Miss is an override only when the opponent's immediately previous move made a real error that created a concrete opportunity, and the player then gives back a substantial amount of that opportunity. Blunders are not converted into Misses.
+
+## Critical Moments
+
+Candidate moments are ranked and capped by game length. This prevents long tactical games from labeling a large fraction of all moves as Critical.
 
 ## Accuracy
 
-Move accuracy is derived from expected-score loss and limited by the final classification. Game accuracy uses a geometric-heavy aggregation with a smaller arithmetic component.
-
-This prevents repeated serious mistakes from being washed out by many trivial or forced moves.
-
-The same aggregation is used for opening / middlegame / endgame accuracy.
-
-## Opening and Book handling
-
-Local opening-prefix recognition determines Book moves. The displayed opening name prefers PGN metadata when available and falls back to the local opening table.
+Move accuracy remains derived from rating-aware expected-score loss and constrained by final classification. Overall and phase accuracy use the geometric-heavy aggregation introduced in V0.2.1. V0.2.3 primarily improves the inputs to that calculation by correcting Best/Miss/error balance.
 
 ## Stored review information
 
-Each review move stores:
+Each review move stores FEN before/after, SAN/UCI, best move, lines, evaluation before/after, expected loss, classification, tags and deterministic explanation.
 
-- FEN before/after
-- SAN/UCI
-- best move
-- principal variations
-- evaluation before/after
-- expected-score loss
-- classification
-- special tags
-- deterministic explanation
-
-The GameReview object also stores the actual engine mode and analysis-quality preset used so the summary can display, for example:
-
-`Stockfish 18 Full NNUE · Standard`
-
-Terminal mate/draw positions receive synthetic terminal evaluations instead of asking Stockfish to search a position with no legal move.
+The GameReview also stores actual engine mode and quality so the summary can display e.g. `Stockfish 18 Full NNUE · Standard`.

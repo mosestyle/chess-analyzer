@@ -136,3 +136,43 @@ The first V0.2.1 rerun of Game 5 produced:
 - V0.2.1 Full accuracy: 53.6 / 42.7
 
 This was a major improvement, especially for White, but V0.2.1's deeper verifier caused sustained high CPU load during the verification phase. V0.2.2 therefore keeps the calibrated scoring/classification model while making verification bounded and thermal-friendly.
+
+## V0.2.2 full five-game follow-up
+
+After the thermal-limited V0.2.2 reruns, the aggregate classification totals across all 289 reviewed plies were:
+
+Reference totals:
+
+- Great 1
+- Book 26
+- Best 78
+- Excellent 38
+- Good 43
+- Inaccuracy 41
+- Mistake 23
+- Miss 20
+- Blunder 13
+
+V0.2.2 totals:
+
+- Great 0
+- Book 26
+- Best 106
+- Excellent 47
+- Good 23
+- Inaccuracy 34
+- Mistake 8
+- Miss 34
+- Blunder 11
+
+The strongest recurring signals were therefore:
+
+- Best +28 (too permissive)
+- Miss +14 (too permissive)
+- Good -20
+- Mistake -15
+- Excellent +9
+- Inaccuracy -7
+- Book exactly matched in aggregate
+
+V0.2.3 is explicitly tuned around these aggregate errors rather than one individual game. It also removes the repeated Standard `10/10` verification behavior observed in all five V0.2.2 test runs.
