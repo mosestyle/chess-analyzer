@@ -1,5 +1,5 @@
-CHESS ANALYZER V0.2.0 — START HERE
-BUILD-FIXED PACKAGE: includes the PlayPage TypeScript fix for the first V0.2 GitHub Actions failure.
+CHESS ANALYZER V0.2.1 — START HERE
+CALIBRATION RELEASE: includes all V0.2 build/layout fixes plus the first five-game analyzer calibration pass.
 
 UPDATING AN EXISTING GITHUB REPOSITORY
 1. Extract this ZIP.
@@ -26,4 +26,4 @@ For local development:
   npm install
   npm run dev
 
-See UPDATE_NOTES_0.2.0.md for this release's fixes and analyzer changes.
+See UPDATE_NOTES_0.2.1.md for this release's analyzer changes.

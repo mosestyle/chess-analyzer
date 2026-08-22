@@ -1,30 +1,40 @@
-import { Chess } from 'chess.js';
 import type { Classification, EngineLine, SpecialTag } from '../types';
 import { movedPieceIsEnPrise } from '../chess/helpers';
 
+const DEFAULT_RATING = 1200;
+
 /**
- * Convert a white-perspective centipawn score into an intuitive expected-score
- * estimate. This is deliberately our own smooth model; it is not intended to
- * reproduce any other site's private accuracy formula.
+ * V0.2.1 calibration model.
+ *
+ * Engine evaluation is converted to expected score with a rating-aware curve.
+ * Lower-rated games use a slightly flatter curve because small engine edges are
+ * converted less reliably, while stronger players get a steeper curve. The
+ * model is intentionally our own approximation rather than a clone of another
+ * site's private formula.
  */
-export function whiteExpectedScore(cp: number) {
-  const bounded = Math.max(-1800, Math.min(1800, cp));
-  return 1 / (1 + Math.exp(-bounded / 235));
+export function ratingScale(rating = DEFAULT_RATING) {
+  const safe = Math.max(100, Math.min(3000, Number.isFinite(rating) ? rating : DEFAULT_RATING));
+  return Math.max(175, Math.min(245, 250 - safe * 0.035));
 }
 
-export function moverExpectedScore(cp: number, color: 'w' | 'b') {
-  const white = whiteExpectedScore(cp);
+export function whiteExpectedScore(cp: number, rating = DEFAULT_RATING) {
+  const bounded = Math.max(-2200, Math.min(2200, cp));
+  return 1 / (1 + Math.exp(-bounded / ratingScale(rating)));
+}
+
+export function moverExpectedScore(cp: number, color: 'w' | 'b', rating = DEFAULT_RATING) {
+  const white = whiteExpectedScore(cp, rating);
   return color === 'w' ? white : 1 - white;
 }
 
-export function expectedLoss(beforeCp: number, afterCp: number, color: 'w' | 'b') {
-  return Math.max(0, moverExpectedScore(beforeCp, color) - moverExpectedScore(afterCp, color));
+export function expectedLoss(beforeCp: number, afterCp: number, color: 'w' | 'b', rating = DEFAULT_RATING) {
+  return Math.max(0, moverExpectedScore(beforeCp, color, rating) - moverExpectedScore(afterCp, color, rating));
 }
 
-function lineGap(lines: EngineLine[], color: 'w' | 'b') {
+function lineGap(lines: EngineLine[], color: 'w' | 'b', rating = DEFAULT_RATING) {
   if (lines.length < 2) return 0;
-  const first = moverExpectedScore(lines[0].scoreCp, color);
-  const second = moverExpectedScore(lines[1].scoreCp, color);
+  const first = moverExpectedScore(lines[0].scoreCp, color, rating);
+  const second = moverExpectedScore(lines[1].scoreCp, color, rating);
   return Math.max(0, first - second);
 }
 
@@ -47,21 +57,30 @@ export function classifyMove(args: {
   legalCount: number;
   beforeCp: number;
   afterCp: number;
+  rating?: number;
 }): Classification {
   const {
     loss, actualUci, bestUci, lines, color, isBook, fenAfter,
-    piece, captured, legalCount, beforeCp, afterCp,
+    piece, captured, legalCount, beforeCp, afterCp, rating = DEFAULT_RATING,
   } = args;
 
-  if (isBook && loss <= 0.02) return 'Book';
+  // Book is an opening-theory label, not an engine-quality bucket. Once the
+  // local opening path recognizes the move, keep the Book label even if the
+  // engine slightly prefers another continuation.
+  if (isBook) return 'Book';
 
   const isBest = actualUci === bestUci;
-  if (isBest) {
-    // A forced move can be best, but it should not be promoted to Great simply
-    // because every alternative is illegal.
+  const cpDrift = Math.abs(beforeCp - afterCp);
+
+  // At practical search depths several moves can be essentially equivalent.
+  // Treat a numerically indistinguishable move as Best rather than flooding the
+  // review with Excellent labels just because Stockfish returned another first
+  // PV at that exact depth.
+  const equivalentBest = !isBest && loss <= 0.0035 && cpDrift <= 18;
+  if (isBest || equivalentBest) {
     if (legalCount <= 1) return 'Best';
 
-    const gap = lineGap(lines, color);
+    const gap = lineGap(lines, color, rating);
     const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const movedValue = values[piece] || 0;
     const capturedValue = captured ? values[captured] || 0 : 0;
@@ -69,27 +88,37 @@ export function classifyMove(args: {
     const sacrificeLike = movedValue >= 3
       && movedPieceIsEnPrise(fenAfter, destination)
       && capturedValue + 1 < movedValue;
-    const beforeExpected = moverExpectedScore(beforeCp, color);
-    const afterExpected = moverExpectedScore(afterCp, color);
+    const beforeExpected = moverExpectedScore(beforeCp, color, rating);
+    const afterExpected = moverExpectedScore(afterCp, color, rating);
 
-    // Brilliant is intentionally rare: the move must be the engine's first
-    // choice, accept a meaningful apparent material risk, preserve the result,
-    // and be notably better than the main alternative.
+    // Brilliant stays deliberately rare. In addition to being effectively the
+    // best move, it must accept a real material risk and have a clear uniqueness
+    // signal from the engine.
     if (
-      sacrificeLike
-      && gap >= 0.06
-      && loss <= 0.006
-      && afterExpected >= Math.max(0.48, beforeExpected - 0.01)
+      isBest
+      && sacrificeLike
+      && gap >= 0.10
+      && loss <= 0.004
+      && beforeExpected <= 0.90
+      && afterExpected >= Math.max(0.50, beforeExpected - 0.008)
     ) return 'Brilliant';
 
-    // Great is reserved for a genuinely important unique-ish best move.
-    if (gap >= 0.12) return 'Great';
+    // Great requires a genuinely important unique best move in a position where
+    // the result is still meaningfully in play. This avoids awarding Great for
+    // routine conversions in positions that are already completely decided.
+    if (
+      isBest
+      && gap >= 0.16
+      && beforeExpected >= 0.15
+      && beforeExpected <= 0.85
+    ) return 'Great';
+
     return 'Best';
   }
 
-  // V0.2 uses expected-score loss bands. The wider separation makes labels
-  // less jumpy at different centipawn scales and makes a Blunder represent a
-  // truly large loss of winning/drawing chances.
+  // Expected-points loss bands intentionally follow the intuitive V2-style
+  // ladder used by the product spec. The rating-aware expected score and deeper
+  // verification pass are what make these bands more stable in V0.2.1.
   if (loss <= 0.02) return 'Excellent';
   if (loss <= 0.05) return 'Good';
   if (loss <= 0.10) return 'Inaccuracy';
@@ -108,23 +137,23 @@ export function specialTags(args: {
   bestUci: string;
   actualUci: string;
   classification: Classification;
+  rating?: number;
 }) {
   const tags: SpecialTag[] = [];
-  const before = moverExpectedScore(args.beforeCp, args.color);
-  const after = moverExpectedScore(args.afterCp, args.color);
-  const gap = lineGap(args.lines, args.color);
+  const rating = args.rating ?? DEFAULT_RATING;
+  const before = moverExpectedScore(args.beforeCp, args.color, rating);
+  const after = moverExpectedScore(args.afterCp, args.color, rating);
+  const gap = lineGap(args.lines, args.color, rating);
 
-  const crossedResultBoundary = (before >= 0.62 && after <= 0.48)
-    || (before >= 0.48 && after <= 0.35);
-  if (args.loss >= 0.10 || crossedResultBoundary || gap >= 0.15) tags.push('Critical Moment');
-  if (args.loss >= 0.20 || (before >= 0.70 && after <= 0.40)) tags.push('Major Turning Point');
-  if (gap >= 0.18 && args.actualUci === args.bestUci) tags.push('Only Move');
+  const crossedResultBoundary = (before >= 0.68 && after <= 0.50)
+    || (before >= 0.52 && after <= 0.34);
+  if (args.loss >= 0.085 || crossedResultBoundary || gap >= 0.18) tags.push('Critical Moment');
+  if (args.loss >= 0.19 || (before >= 0.76 && after <= 0.38)) tags.push('Major Turning Point');
+  if (gap >= 0.20 && args.actualUci === args.bestUci && before >= 0.15 && before <= 0.85) tags.push('Only Move');
   if (args.classification === 'Brilliant') tags.push('Winning Sacrifice');
 
-  if (before >= 0.80 && after < 0.60 && args.loss >= 0.12) tags.push('Missed Win');
+  if (before >= 0.78 && after < 0.58 && args.loss >= 0.12) tags.push('Missed Win');
 
-  // Mate scores are normalized to White in the engine layer. Convert them back
-  // to the mover's perspective so missed mates work for both White and Black.
   const mateBefore = mateForColor(args.beforeMate ?? args.lines[0]?.mate, args.color);
   const mateAfter = mateForColor(args.afterMate, args.color);
   if (mateBefore > 0 && mateAfter <= 0 && args.actualUci !== args.bestUci) tags.push('Missed Mate');

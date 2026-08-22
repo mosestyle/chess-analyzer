@@ -485,3 +485,32 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
   .review-engine-scroll { overflow: visible; }
   .review-graph-slot .graph-wrap { margin-top: 16px; }
 }
+
+/* V0.2.1 analysis metadata -------------------------------------------------- */
+.summary-kicker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.summary-kicker-row .eyebrow { margin: 0; }
+.analysis-meta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .analysis-meta {
+    font-size: .72rem;
+    padding-inline: 8px;
+  }
+}

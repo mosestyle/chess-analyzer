@@ -66,7 +66,12 @@ export interface GameReview {
   startFen: string;
   whiteName: string;
   blackName: string;
+  whiteElo?: number;
+  blackElo?: number;
+  eco?: string;
   opening: string;
+  engineMode: EngineMode;
+  analysisQuality: AnalysisQuality;
   moves: ReviewMove[];
   whiteAccuracy: number;
   blackAccuracy: number;

@@ -1,4 +1,4 @@
-# Classification specification — V0.2
+# Classification specification — V0.2.1
 
 Main labels:
 
@@ -13,7 +13,7 @@ Main labels:
 - Miss
 - Blunder
 
-Special tags are separate and may coexist with a main label:
+Special tags remain separate from the main label:
 
 - Critical Moment
 - Only Move
@@ -25,6 +25,12 @@ Special tags are separate and may coexist with a main label:
 - Hanging Piece
 - Major Turning Point
 
+## Rating-aware expected-score model
+
+Stockfish centipawn evaluations are converted into mover expected score before loss is measured. V0.2.1 reads `WhiteElo` / `BlackElo` from PGN headers and adjusts the curve modestly by player rating. Missing ratings use 1200.
+
+This is an independent local model. It is not a copy of another site's private probability curve.
+
 ## Expected-score loss bands
 
 For a legal non-best, non-book move:
@@ -35,34 +41,45 @@ For a legal non-best, non-book move:
 - Mistake: loss <= 0.20
 - Blunder: loss > 0.20
 
-The expected-score function is our own smooth mapping from Stockfish's white-perspective centipawn evaluation. This keeps the same centipawn loss from being treated identically in equal, winning and completely lost positions.
+Book is an opening-theory label and takes precedence when the local opening path recognizes the move.
 
-## Best / Great / Brilliant
+## Best / equivalent Best
 
-A move that exactly matches Stockfish's top UCI move is normally Best.
+An exact Stockfish top UCI move is Best unless it satisfies stricter Great/Brilliant conditions.
+
+Because principal variations can reorder at practical search depths, a non-top move may also be treated as Best when its expected loss and centipawn drift are numerically indistinguishable from zero. This reduces false `Excellent` labels caused only by unstable PV ordering.
+
+## Great
 
 Great requires:
-- the played move is Stockfish's top move
+
+- the played move is the actual top engine move
 - more than one legal move exists
-- a meaningful expected-score gap (>= 0.12) to the second engine line
+- a large expected-score gap to the second line
+- the position is not already almost completely won or lost
+
+This keeps Great focused on genuinely important unique moves rather than routine conversion moves.
+
+## Brilliant
 
 Brilliant is deliberately rare and requires:
-- the played move is Stockfish's top move
-- an apparent meaningful material risk/sacrifice
-- a meaningful gap to the second line
-- essentially no expected-score loss
-- the move preserves at least a viable result
 
-Forced moves are not promoted to Great solely because no legal alternative exists.
+- actual top engine move
+- apparent meaningful material risk/sacrifice
+- strong uniqueness signal versus the second line
+- essentially no expected-score loss
+- a position where the sacrifice preserves a viable result
 
 ## Miss
 
-Miss is applied as a second-pass contextual label. V0.2 checks that the opponent's previous move created a meaningful expected-score opportunity and that the current player then gave a substantial amount of it back.
+Miss is applied contextually after ordinary move classification. V0.2.1 measures how much opportunity the opponent's previous move created, then checks whether the player gave a meaningful share of that opportunity back.
+
+Missed Mate remains a special tag and is handled separately so a forced mating opportunity is explained explicitly.
 
 ## Special tags
 
-Critical Moment triggers for a large expected-score swing, meaningful result-boundary crossing, or a large best-vs-second-line gap.
+Critical Moment, Major Turning Point and Only Move thresholds are stricter than V0.2 to reduce tag spam in tactical games.
 
-Missed Mate is color-aware: Stockfish mate scores are normalized to White in the engine layer, then converted to the mover's perspective before tagging.
+Mate scores are normalized to White in the engine layer and converted back to the mover's perspective when determining missed-mate context.
 
-This specification is a tunable local heuristic and does not claim to reproduce another site's private classification rules.
+This specification remains intentionally tunable for future calibration rounds.

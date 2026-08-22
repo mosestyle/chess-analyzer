@@ -30,14 +30,33 @@ function terminalAnalysis(fen: string): EngineAnalysis | null {
   return { fen, depth: 0, bestMove: '(none)', lines: [], scoreCp, mate };
 }
 
-async function analyzePosition(fen: string, mode: EngineMode, quality: AnalysisQuality, multiPV = 1) {
+function parseRating(value: string | undefined) {
+  const rating = Number.parseInt(value || '', 10);
+  return Number.isFinite(rating) && rating > 0 ? rating : undefined;
+}
+
+function ratingFor(color: 'w' | 'b', whiteElo?: number, blackElo?: number) {
+  return color === 'w' ? (whiteElo ?? 1200) : (blackElo ?? 1200);
+}
+
+async function analyzePosition(
+  fen: string,
+  mode: EngineMode,
+  quality: AnalysisQuality,
+  multiPV = 1,
+  depthOverride?: number,
+) {
   const terminal = terminalAnalysis(fen);
   if (terminal) return terminal;
   const preset = ANALYSIS_PRESETS[quality];
   const engine = await engineManager.get(mode);
-  return engine.analyze(fen, { depth: preset.reviewDepth, multiPV, hash: 24 });
+  return engine.analyze(fen, { depth: depthOverride ?? preset.reviewDepth, multiPV, hash: 24 });
 }
 
+function addVerifyPosition(map: Map<number, number>, index: number, total: number, multiPV: number) {
+  if (index < 0 || index >= total) return;
+  map.set(index, Math.max(map.get(index) || 1, multiPV));
+}
 
 export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Promise<GameReview> {
   const parsed = new Chess();
@@ -46,6 +65,8 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
   const history = parsed.history({ verbose: true });
   if (!history.length) throw new Error('The PGN does not contain any moves.');
 
+  const whiteElo = parseRating(headers.WhiteElo);
+  const blackElo = parseRating(headers.BlackElo);
   const startFen = headers.FEN || START_FEN;
   const replay = new Chess(startFen);
   const moves = history.map((source) => {
@@ -80,64 +101,84 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     }
   }
 
+  // Pass 1: quick, single-PV evaluation of every position.
   for (let i = 0; i < positionFens.length; i++) {
     if (options.signal?.aborted) {
       await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
       throw new DOMException('Analysis cancelled.', 'AbortError');
     }
     options.onProgress?.({ done: i, total: positionFens.length, stage: `Analyzing position ${i + 1} of ${positionFens.length}` });
-    // First pass deliberately uses MultiPV 1. This is the biggest speed win for
-    // full-game review: every game can contain dozens of positions, while only
-    // a subset actually needs alternative lines to classify Great/Brilliant or
-    // explain an important error.
     analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality, 1));
   }
 
-  // Second pass: enrich only positions where alternatives materially improve
-  // the review. Best-move candidates need a second line for Great/Brilliant/
-  // Only Move detection, and sizeable errors benefit from an alternative line.
-  // This keeps the review much faster than running MultiPV 2-3 on every ply.
+  // V0.2.1 selective verification pass. Standard keeps its fast depth-12 scan,
+  // then rechecks positions that are ambiguous, tactical, mate-related, or
+  // candidates for Best/Great/Brilliant at a substantially deeper depth.
   const preset = ANALYSIS_PRESETS[options.quality];
-  if (preset.reviewMultiPV > 1) {
-    const detailCandidates: number[] = [];
-    for (let i = 0; i < moves.length; i++) {
-      const color = moves[i].source.color as 'w' | 'b';
-      const loss = expectedLoss(analyses[i].scoreCp, analyses[i + 1].scoreCp, color);
-      const isBestCandidate = moves[i].uci === analyses[i].bestMove && !(i < 24 && isLikelyBookMove(sans, i));
-      const mateCandidate = Boolean(analyses[i].mate);
-      const isImportantError = loss >= 0.10;
-      if (isBestCandidate || isImportantError || mateCandidate) detailCandidates.push(i);
-    }
+  const verifyPositions = new Map<number, number>();
+  for (let i = 0; i < moves.length; i++) {
+    const color = moves[i].source.color as 'w' | 'b';
+    const rating = ratingFor(color, whiteElo, blackElo);
+    const before = analyses[i];
+    const after = analyses[i + 1];
+    const loss = expectedLoss(before.scoreCp, after.scoreCp, color, rating);
+    const isBook = i < 28 && isLikelyBookMove(sans, i);
+    const isBestCandidate = moves[i].uci === before.bestMove && !isBook;
+    const ambiguousNonBest = moves[i].uci !== before.bestMove && !isBook && loss >= 0.015;
+    const importantError = loss >= 0.065;
+    const cpSwing = Math.abs(before.scoreCp - after.scoreCp) >= 80;
+    const mateCandidate = Boolean(before.mate || after.mate);
+    const tacticalCandidate = movedPieceIsEnPrise(moves[i].fenAfter, moves[i].uci.slice(2, 4));
 
-    for (let n = 0; n < detailCandidates.length; n++) {
-      if (options.signal?.aborted) {
-        await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
-        throw new DOMException('Analysis cancelled.', 'AbortError');
-      }
-      const i = detailCandidates[n];
-      options.onProgress?.({
-        done: positionFens.length - 1,
-        total: positionFens.length,
-        stage: `Refining important move ${n + 1} of ${detailCandidates.length}`,
-      });
-      analyses[i] = await analyzePosition(positionFens[i], activeMode, options.quality, preset.reviewMultiPV);
+    if (isBestCandidate) {
+      // Best/Great/Brilliant needs a deeper pre-move MultiPV comparison, but we
+      // do not need to re-search the post-move position just to decide whether
+      // the played move was Stockfish's top choice.
+      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV);
     }
+    if (ambiguousNonBest || importantError || cpSwing || mateCandidate || tacticalCandidate) {
+      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV);
+      addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1);
+    }
+  }
+
+  const verifyList = [...verifyPositions.entries()].sort((a, b) => a[0] - b[0]);
+  for (let n = 0; n < verifyList.length; n++) {
+    if (options.signal?.aborted) {
+      await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
+      throw new DOMException('Analysis cancelled.', 'AbortError');
+    }
+    const [positionIndex, multiPV] = verifyList[n];
+    options.onProgress?.({
+      done: positionFens.length - 1,
+      total: positionFens.length,
+      stage: `Verifying important position ${n + 1} of ${verifyList.length}`,
+    });
+    analyses[positionIndex] = await analyzePosition(
+      positionFens[positionIndex],
+      activeMode,
+      options.quality,
+      multiPV,
+      preset.reviewVerifyDepth,
+    );
   }
 
   const reviewMoves: ReviewMove[] = moves.map((move, index) => {
     const before = analyses[index];
     const after = analyses[index + 1];
     const color = move.source.color as 'w' | 'b';
-    const loss = expectedLoss(before.scoreCp, after.scoreCp, color);
+    const rating = ratingFor(color, whiteElo, blackElo);
+    const loss = expectedLoss(before.scoreCp, after.scoreCp, color, rating);
     const bestMove = before.bestMove;
     const legalCount = new Chess(move.fenBefore).moves().length;
+    const isBook = index < 28 && isLikelyBookMove(sans, index);
     const classification = classifyMove({
       loss,
       actualUci: move.uci,
       bestUci: bestMove,
       lines: before.lines,
       color,
-      isBook: index < 24 && isLikelyBookMove(sans, index),
+      isBook,
       fenBefore: move.fenBefore,
       fenAfter: move.fenAfter,
       piece: move.source.piece,
@@ -145,6 +186,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       legalCount,
       beforeCp: before.scoreCp,
       afterCp: after.scoreCp,
+      rating,
     });
     const tags = specialTags({
       loss,
@@ -157,6 +199,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       bestUci: bestMove,
       actualUci: move.uci,
       classification,
+      rating,
     });
     if (legalCount === 1 && !tags.includes('Forced Move')) tags.push('Forced Move');
     if (['Mistake', 'Blunder'].includes(classification) && movedPieceIsEnPrise(move.fenAfter, move.uci.slice(2, 4)) && !tags.includes('Hanging Piece')) tags.push('Hanging Piece');
@@ -192,22 +235,26 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     return review;
   });
 
-  // A "Miss" is not just any error after an opponent error. V0.2 checks that
-  // the opponent actually handed over a meaningful increase in expected score
-  // and that the player then gave a substantial part of that opportunity back.
+  // A Miss requires a real opportunity created by the opponent and a meaningful
+  // failure to cash it in. The Full-NNUE calibration games showed V0.2 slightly
+  // under-counted Misses, so V0.2.1 keys off the opportunity swing itself rather
+  // than requiring the preceding move to have already received Mistake/Blunder.
   for (let i = 1; i < reviewMoves.length; i++) {
     const previous = reviewMoves[i - 1];
     const current = reviewMoves[i];
-    const beforeOpponentMove = moverExpectedScore(previous.evalBefore, current.color);
-    const afterOpponentMove = moverExpectedScore(current.evalBefore, current.color);
+    const rating = ratingFor(current.color, whiteElo, blackElo);
+    const beforeOpponentMove = moverExpectedScore(previous.evalBefore, current.color, rating);
+    const afterOpponentMove = moverExpectedScore(current.evalBefore, current.color, rating);
     const opportunityGain = Math.max(0, afterOpponentMove - beforeOpponentMove);
-    const opponentErrored = ['Mistake', 'Blunder'].includes(previous.classification);
-    const meaningfulOpportunity = opportunityGain >= 0.10 || (opponentErrored && opportunityGain >= 0.06);
+    const meaningfulOpportunity = opportunityGain >= 0.075;
+    const gaveBackEnough = current.expectedLoss >= 0.06
+      && current.expectedLoss >= Math.min(0.10, opportunityGain * 0.45);
 
     if (
       meaningfulOpportunity
-      && current.expectedLoss >= 0.08
-      && ['Inaccuracy', 'Mistake'].includes(current.classification)
+      && gaveBackEnough
+      && ['Inaccuracy', 'Mistake', 'Blunder'].includes(current.classification)
+      && !current.tags.includes('Missed Mate')
     ) {
       current.classification = 'Miss';
       if (!current.tags.includes('Missed Tactic')) current.tags.push('Missed Tactic');
@@ -236,7 +283,12 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     startFen,
     whiteName: headers.White || 'White',
     blackName: headers.Black || 'Black',
-    opening: detectOpening(sans),
+    whiteElo,
+    blackElo,
+    eco: headers.ECO,
+    opening: detectOpening(sans, headers),
+    engineMode: activeMode,
+    analysisQuality: options.quality,
     moves: reviewMoves,
     whiteAccuracy: sideAccuracy(reviewMoves, 'w'),
     blackAccuracy: sideAccuracy(reviewMoves, 'b'),

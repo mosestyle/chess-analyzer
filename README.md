@@ -1,6 +1,6 @@
-# Chess Analyzer V0.2
+# Chess Analyzer V0.2.1
 
-**Current release:** 0.2.0
+**Current release:** 0.2.1
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.0.md`](UPDATE_NOTES_0.2.0.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.1.md`](UPDATE_NOTES_0.2.1.md).
 
 ## Calibration warning
 
@@ -87,8 +87,6 @@ Application source: MIT (see `LICENSE`).
 
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
 
-## 0.2.0 analyzer intelligence + review layout
+## 0.2.1 calibrated analyzer
 
-Version 0.2.0 anchors desktop Previous/Next to a fixed review-panel footer so long commentary, extra engine lines and the optional graph can no longer move the controls. Engine lines scroll inside their own slot.
-
-The analyzer layer also receives a first major calibration pass: expected-score loss bands, rarer Great/Brilliant detection, color-correct missed mates, contextual Miss detection, richer local explanations, stronger accuracy weighting, phase detection based partly on material, and broader opening recognition. See `UPDATE_NOTES_0.2.0.md`.
+Version 0.2.1 is the first data-driven calibration pass based on five Full-NNUE/Standard comparison games. It adds rating-aware expected score, selective deeper verification, stricter Great/Brilliant rules, a stronger accuracy model, improved Miss handling, richer ECO/opening metadata, and an engine/quality badge on Analysis Complete. See `UPDATE_NOTES_0.2.1.md` and `docs/CALIBRATION.md`.

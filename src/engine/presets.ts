@@ -5,9 +5,11 @@ export interface AnalysisPreset {
   /** Deeper settings for a single pasted FEN. */
   positionDepth: number;
   positionMultiPV: number;
-  /** Faster settings for full-game review, where dozens of positions are analyzed. */
+  /** Fast first pass for a full-game review. */
   reviewDepth: number;
   reviewMultiPV: number;
+  /** Selective second-pass depth for ambiguous/critical moves. */
+  reviewVerifyDepth: number;
 }
 
 export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
@@ -17,6 +19,7 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 2,
     reviewDepth: 9,
     reviewMultiPV: 2,
+    reviewVerifyDepth: 12,
   },
   standard: {
     label: 'Standard',
@@ -24,6 +27,7 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 12,
     reviewMultiPV: 2,
+    reviewVerifyDepth: 17,
   },
   deep: {
     label: 'Deep',
@@ -31,6 +35,7 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 15,
     reviewMultiPV: 2,
+    reviewVerifyDepth: 20,
   },
   maximum: {
     label: 'Maximum',
@@ -38,5 +43,6 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     positionMultiPV: 3,
     reviewDepth: 19,
     reviewMultiPV: 3,
+    reviewVerifyDepth: 23,
   },
 };

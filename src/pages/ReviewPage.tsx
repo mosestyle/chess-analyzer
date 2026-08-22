@@ -8,6 +8,7 @@ import { lineToSan, uciToSan } from '../chess/helpers';
 import { playChessSound } from '../services/sound';
 import { phaseAccuracies } from '../analysis/accuracy';
 import type { Classification, GameReview, Settings } from '../types';
+import { ANALYSIS_PRESETS } from '../engine/presets';
 
 const ORDER: Classification[] = ['Brilliant', 'Great', 'Best', 'Excellent', 'Good', 'Book', 'Inaccuracy', 'Mistake', 'Miss', 'Blunder'];
 type ReviewView = 'summary' | 'review';
@@ -108,7 +109,10 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
         <AppHeader title="Game Review" onBack={onBack} right={<button className="icon-button" onClick={onSettings}>⚙</button>} />
         <div className="summary-dashboard">
           <section className="summary-hero panel">
-            <p className="eyebrow">ANALYSIS COMPLETE</p>
+            <div className="summary-kicker-row">
+              <p className="eyebrow">ANALYSIS COMPLETE</p>
+              <span className="analysis-meta">{review.engineMode === 'full' ? 'Stockfish 18 Full NNUE' : 'Stockfish 18 Lite'} · {ANALYSIS_PRESETS[review.analysisQuality].label}</span>
+            </div>
             <h2>{review.whiteName} vs {review.blackName}</h2>
             <p>{review.opening}</p>
             <EvaluationGraph moves={review.moves} onSelect={(i) => { onIndexChange(i); onViewChange('review'); }} />
