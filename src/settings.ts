@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showBestArrows: true,
   showEvaluation: true,
   showEngineLines: true,
+  showReviewGraph: true,
   showCriticalMoments: true,
   defaultDifficulty: 5,
   defaultSide: 'random',

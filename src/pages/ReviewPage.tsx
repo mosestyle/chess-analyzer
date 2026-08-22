@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { ChessBoard, type BoardMove } from '../components/ChessBoard';
 import { ClassificationBadge } from '../components/ClassificationBadge';
@@ -81,51 +81,76 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
     </div>
   );
 
+  useEffect(() => {
+    if (view !== 'review') return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (target?.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if (event.key === 'ArrowLeft' && safeIndex > 0) {
+        event.preventDefault();
+        jump(safeIndex - 1);
+      } else if (event.key === 'ArrowRight' && safeIndex < review.moves.length - 1) {
+        event.preventDefault();
+        jump(safeIndex + 1);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [view, safeIndex, review.moves.length, settings.sound, settings.reviewSounds, settings.volume]);
+
   if (view === 'summary') {
     return (
-      <main className="page review-page">
+      <main className="page review-page summary-page">
         <AppHeader title="Game Review" onBack={onBack} right={<button className="icon-button" onClick={onSettings}>⚙</button>} />
-        <section className="summary-hero panel">
-          <p className="eyebrow">ANALYSIS COMPLETE</p>
-          <h2>{review.whiteName} vs {review.blackName}</h2>
-          <p>{review.opening}</p>
-          <EvaluationGraph moves={review.moves} onSelect={(i) => { onIndexChange(i); onViewChange('review'); }} />
-        </section>
+        <div className="summary-dashboard">
+          <section className="summary-hero panel">
+            <p className="eyebrow">ANALYSIS COMPLETE</p>
+            <h2>{review.whiteName} vs {review.blackName}</h2>
+            <p>{review.opening}</p>
+            <EvaluationGraph moves={review.moves} onSelect={(i) => { onIndexChange(i); onViewChange('review'); }} />
+          </section>
 
-        <section className="panel score-card">
-          <div className="score-head">
-            <div><span>White</span><strong>{review.whiteName}</strong><b>{review.whiteAccuracy}</b></div>
-            <div className="versus">Accuracy</div>
-            <div><span>Black</span><strong>{review.blackName}</strong><b>{review.blackAccuracy}</b></div>
-          </div>
-          <div className="classification-table">
-            {ORDER.map((name) => (
-              <div className="classification-row" key={name}>
-                <strong>{review.counts.white[name]}</strong>
-                <ClassificationBadge value={name} />
-                <strong>{review.counts.black[name]}</strong>
+          <button className="primary full-width summary-start-action" onClick={() => onViewChange('review')}>Start review</button>
+
+          <section className="panel score-card">
+            <div className="score-head">
+              <div><span>White</span><strong>{review.whiteName}</strong><b>{review.whiteAccuracy}</b></div>
+              <div className="versus">Accuracy</div>
+              <div><span>Black</span><strong>{review.blackName}</strong><b>{review.blackAccuracy}</b></div>
+            </div>
+            <div className="classification-table">
+              {ORDER.map((name) => (
+                <div className="classification-row" key={name}>
+                  <strong>{review.counts.white[name]}</strong>
+                  <ClassificationBadge value={name} />
+                  <strong>{review.counts.black[name]}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="summary-lower">
+            <section className="panel summary-details">
+              <div><span>Opening</span><strong>{review.opening}</strong></div>
+              <div><span>Critical moments</span><strong>{review.moves.filter((m) => m.tags.includes('Critical Moment')).length}</strong></div>
+              <div><span>Moves reviewed</span><strong>{review.moves.length}</strong></div>
+            </section>
+
+            <section className="panel phase-card">
+              <h3>Game phase accuracy</h3>
+              <div className="phase-grid">
+                <span></span><strong>{review.whiteName}</strong><strong>{review.blackName}</strong>
+                <span>Opening</span><b>{whitePhases.opening ?? '—'}</b><b>{blackPhases.opening ?? '—'}</b>
+                <span>Middlegame</span><b>{whitePhases.middlegame ?? '—'}</b><b>{blackPhases.middlegame ?? '—'}</b>
+                <span>Endgame</span><b>{whitePhases.endgame ?? '—'}</b><b>{blackPhases.endgame ?? '—'}</b>
               </div>
-            ))}
+            </section>
           </div>
-        </section>
-
-        <section className="panel summary-details">
-          <div><span>Opening</span><strong>{review.opening}</strong></div>
-          <div><span>Critical moments</span><strong>{review.moves.filter((m) => m.tags.includes('Critical Moment')).length}</strong></div>
-          <div><span>Moves reviewed</span><strong>{review.moves.length}</strong></div>
-        </section>
-
-        <section className="panel phase-card">
-          <h3>Game phase accuracy</h3>
-          <div className="phase-grid">
-            <span></span><strong>{review.whiteName}</strong><strong>{review.blackName}</strong>
-            <span>Opening</span><b>{whitePhases.opening ?? '—'}</b><b>{blackPhases.opening ?? '—'}</b>
-            <span>Middlegame</span><b>{whitePhases.middlegame ?? '—'}</b><b>{blackPhases.middlegame ?? '—'}</b>
-            <span>Endgame</span><b>{whitePhases.endgame ?? '—'}</b><b>{blackPhases.endgame ?? '—'}</b>
-          </div>
-        </section>
-
-        <button className="primary full-width sticky-action" onClick={() => onViewChange('review')}>Start review</button>
+        </div>
       </main>
     );
   }
@@ -185,7 +210,7 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
             </div>
           )}
 
-          <EvaluationGraph moves={review.moves} selected={safeIndex} onSelect={jump} />
+          {settings.showReviewGraph && <EvaluationGraph moves={review.moves} selected={safeIndex} onSelect={jump} />}
 
           <div className="prev-next">
             <button disabled={safeIndex === 0} onClick={() => jump(safeIndex - 1)}>← Previous</button>

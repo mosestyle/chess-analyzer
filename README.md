@@ -86,3 +86,7 @@ They are not Chess.com's proprietary Game Review implementation.
 Application source: MIT (see `LICENSE`).
 
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
+
+## 0.1.2 review polish
+
+Version 0.1.2 adds keyboard Left/Right move navigation, stable-height review commentary, an optional in-review evaluation graph, sticky desktop Previous/Next controls, and a compact Analysis Complete dashboard with Start Review surfaced much earlier.

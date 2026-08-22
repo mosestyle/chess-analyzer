@@ -67,6 +67,7 @@ export function SettingsPage({ settings, setSettings, onBack }: {
       <section className="panel settings-section">
         <h2>Review</h2>
         <Toggle label="Show engine lines" checked={settings.showEngineLines} onChange={(v) => patch('showEngineLines', v)} />
+        <Toggle label="Evaluation graph during review" sub="Show the graph below Show best / Retry" checked={settings.showReviewGraph} onChange={(v) => patch('showReviewGraph', v)} />
         <Toggle label="Show critical moments" checked={settings.showCriticalMoments} onChange={(v) => patch('showCriticalMoments', v)} />
       </section>
 

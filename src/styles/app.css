@@ -328,3 +328,97 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
   .board-step-nav { padding-top: 10px; padding-bottom: 4px; }
   .board-step-nav button { min-height: 44px; border-radius: 12px; }
 }
+
+/* 0.1.2 review polish ------------------------------------------------------ */
+
+/* Keep review commentary from moving the board/navigation when text is long. */
+.mobile-review-card .review-card,
+.desktop-review-card .review-card {
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.desktop-review-card .review-card {
+  height: 158px;
+  overflow-y: auto;
+}
+
+/* Keep desktop move navigation reachable even when optional review content is tall. */
+@media (min-width: 861px) {
+  .active-review .review-side .prev-next {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface) 18%);
+    padding-top: 16px;
+    padding-bottom: 2px;
+  }
+}
+
+/* Compact, two-column summary dashboard on desktop so the primary action is visible immediately. */
+.summary-dashboard {
+  max-width: 1100px;
+  margin: 12px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
+  grid-template-areas:
+    "hero score"
+    "action score"
+    "lower score";
+  gap: 12px 16px;
+  align-items: start;
+}
+.summary-dashboard .summary-hero { grid-area: hero; max-width: none; margin: 0; padding: 18px; }
+.summary-dashboard .summary-start-action { grid-area: action; margin: 0; min-height: 50px; }
+.summary-dashboard .score-card { grid-area: score; max-width: none; margin: 0; padding: 16px 18px; }
+.summary-dashboard .summary-lower { grid-area: lower; display: grid; gap: 12px; min-width: 0; }
+.summary-dashboard .summary-details,
+.summary-dashboard .phase-card { max-width: none; margin: 0; }
+.summary-dashboard .summary-details { padding: 14px 16px; }
+.summary-dashboard .phase-card { padding: 14px 16px; }
+.summary-dashboard .phase-card h3 { font-size: .94rem; margin-bottom: 10px; }
+.summary-dashboard .phase-grid { gap: 7px; }
+.summary-dashboard .phase-grid strong,
+.summary-dashboard .phase-grid b { padding: 6px; }
+.summary-dashboard .score-head { padding-bottom: 11px; }
+.summary-dashboard .score-head b { font-size: 2.1rem; }
+.summary-dashboard .classification-table { padding-top: 6px; }
+.summary-dashboard .classification-row { padding: 4px 0; }
+.summary-dashboard .classification b { width: 27px; height: 27px; }
+.summary-dashboard .summary-hero .graph-wrap { margin-top: 10px; }
+.summary-dashboard .summary-hero .eval-graph { height: 128px; }
+.summary-page { padding-bottom: 18px; }
+
+@media (max-width: 860px) {
+  .summary-dashboard {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "hero"
+      "action"
+      "score"
+      "lower";
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .summary-dashboard .summary-start-action {
+    margin-inline: 14px;
+    width: calc(100% - 28px);
+  }
+  .summary-dashboard .summary-lower { gap: 12px; }
+
+  /* Fixed review-card footprint keeps the board and arrows at a stable vertical position. */
+  .mobile-review-card .review-card {
+    height: 158px;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .summary-dashboard .summary-hero .eval-graph { height: 112px; }
+  .summary-dashboard .score-card { padding-block: 14px; }
+  .summary-dashboard .classification-row { padding: 4px 0; }
+  .summary-dashboard .summary-details,
+  .summary-dashboard .phase-card { padding-inline: 16px; }
+  .mobile-review-card .review-card { height: 152px; }
+}

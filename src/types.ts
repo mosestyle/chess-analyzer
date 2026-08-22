@@ -91,6 +91,7 @@ export interface Settings {
   showBestArrows: boolean;
   showEvaluation: boolean;
   showEngineLines: boolean;
+  showReviewGraph: boolean;
   showCriticalMoments: boolean;
   defaultDifficulty: number;
   defaultSide: SideChoice;

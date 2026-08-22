@@ -1,21 +1,28 @@
-CHESS ANALYZER V1 — START HERE
+CHESS ANALYZER V0.1.2 — START HERE
 
+UPDATING AN EXISTING GITHUB REPOSITORY
+1. Extract this ZIP.
+2. Open your existing local chess-analyzer repository folder.
+3. Delete/replace the old project files, but DO NOT delete the hidden .git folder.
+4. Copy ALL files/folders from this ZIP into that repository folder.
+   Important: include the hidden .github folder.
+5. Open GitHub Desktop, commit the changes, then Push origin.
+6. Wait for the GitHub Pages Action to finish.
+7. Hard-refresh the website once if an older cached build appears.
+
+NEW REPOSITORY
 1. Extract this ZIP.
 2. Create a new PUBLIC GitHub repository (example: chess-analyzer).
-3. Upload ALL files/folders inside the extracted chess-analyzer-v1 folder to the repository root.
-   Important: include the hidden .github folder.
-4. Commit to the main branch.
+3. Upload ALL files/folders to the repository root, including .github.
+4. Commit to main.
 5. GitHub repository -> Settings -> Pages -> Source: GitHub Actions.
-6. Open Actions and wait for "Build and deploy Chess Analyzer" to finish.
-7. Your Pages URL will appear in Settings -> Pages.
+6. Wait for "Build and deploy Chess Analyzer" to finish.
 
 You DO NOT need to manually add Stockfish files.
-The GitHub Actions build downloads stockfish@18.0.8 and prepares:
-- Stockfish 18 Full NNUE single-threaded
-- Stockfish 18 Lite single-threaded
+The GitHub Actions build downloads stockfish@18.0.8 and prepares Full NNUE + Lite.
 
 For local development:
   npm install
   npm run dev
 
-Read DEPLOY_GITHUB.md for the full guide.
+See UPDATE_NOTES_0.1.2.md for this release's fixes.
