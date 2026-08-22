@@ -1,4 +1,4 @@
-CHESS ANALYZER V0.2.1 — START HERE
+CHESS ANALYZER V0.2.2 — START HERE
 CALIBRATION RELEASE: includes all V0.2 build/layout fixes plus the first five-game analyzer calibration pass.
 
 UPDATING AN EXISTING GITHUB REPOSITORY
@@ -26,4 +26,4 @@ For local development:
   npm install
   npm run dev
 
-See UPDATE_NOTES_0.2.1.md for this release's analyzer changes.
+See UPDATE_NOTES_0.2.2.md for this release's thermal/performance changes, and UPDATE_NOTES_0.2.1.md for the calibration changes.

@@ -1,8 +1,8 @@
-# Analysis specification — V0.2.1
+# Analysis specification — V0.2.2
 
 For a PGN, reconstruct every position from the starting FEN. Stockfish scores are normalized to White in the engine layer, while classification and expected-score loss are evaluated from the mover's perspective.
 
-PGN metadata used by V0.2.1 includes:
+PGN metadata used by V0.2.2 includes:
 
 - White / Black names
 - WhiteElo / BlackElo when present
@@ -28,22 +28,37 @@ Every position is analyzed with MultiPV 1 at the selected review depth.
 
 Standard uses depth 12 for this pass.
 
-### Pass 2 — selective deeper verification
+### Pass 2 — thermal-friendly selective verification
 
-Positions likely to change the human-facing review are re-analyzed at a deeper verification depth. Standard uses depth 17.
+V0.2.2 keeps deeper verification, but no longer deeply rechecks every routine Best move or every broad tactical heuristic.
 
-Verification candidates include:
+Standard:
 
-- Best / Great / Brilliant candidates
-- ambiguous non-best moves
-- meaningful expected-score losses
-- large raw evaluation swings
-- mate-related positions
-- tactical moved-piece-en-prise situations
+- verification depth 15
+- maximum 10 deeper verification positions per game
+- 160 ms idle gap between verification searches
+- MultiPV 2 only where alternative-line information can change a boundary/special-move decision
 
-When a played move needs verification, both the pre-move and post-move positions are rechecked as needed so expected loss is not calculated from mismatched search depths.
+Verification priority is highest for:
 
-Alternative lines use MultiPV only where they add classification or explanation value.
+- mate transitions
+- large expected-score errors
+- moves close to classification boundaries
+- meaningful practical/evaluation swings
+- plausible Great / Brilliant / Only-Move candidates
+
+Routine Best moves are kept from the first pass unless they have a special uniqueness/tactical signal.
+
+This deliberately trades a small amount of second-pass depth for much lower sustained CPU use on Full NNUE while preserving the V0.2.1 rating-aware classification model.
+
+## Quality preset verification budgets
+
+- Quick: verify depth 11, max 4 positions, 100 ms idle gap
+- Standard: verify depth 15, max 10 positions, 160 ms idle gap
+- Deep: verify depth 18, max 14 positions, 90 ms idle gap
+- Maximum: verify depth 21, max 20 positions, 40 ms idle gap
+
+Deep and Maximum are intentionally more CPU intensive.
 
 ## Accuracy
 

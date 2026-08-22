@@ -50,12 +50,35 @@ async function analyzePosition(
   if (terminal) return terminal;
   const preset = ANALYSIS_PRESETS[quality];
   const engine = await engineManager.get(mode);
-  return engine.analyze(fen, { depth: depthOverride ?? preset.reviewDepth, multiPV, hash: 24 });
+  return engine.analyze(fen, { depth: depthOverride ?? preset.reviewDepth, multiPV, hash: 16 });
 }
 
-function addVerifyPosition(map: Map<number, number>, index: number, total: number, multiPV: number) {
+interface VerifyTarget {
+  multiPV: number;
+  priority: number;
+}
+
+function addVerifyPosition(
+  map: Map<number, VerifyTarget>,
+  index: number,
+  total: number,
+  multiPV: number,
+  priority: number,
+) {
   if (index < 0 || index >= total) return;
-  map.set(index, Math.max(map.get(index) || 1, multiPV));
+  const current = map.get(index);
+  map.set(index, {
+    multiPV: Math.max(current?.multiPV || 1, multiPV),
+    priority: Math.max(current?.priority || 0, priority),
+  });
+}
+
+function nearClassificationBoundary(loss: number) {
+  return [0.02, 0.05, 0.10, 0.20].some((boundary) => Math.abs(loss - boundary) <= 0.012);
+}
+
+function coolDown(ms: number) {
+  return ms > 0 ? new Promise<void>((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
 export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Promise<GameReview> {
@@ -111,11 +134,14 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality, 1));
   }
 
-  // V0.2.1 selective verification pass. Standard keeps its fast depth-12 scan,
-  // then rechecks positions that are ambiguous, tactical, mate-related, or
-  // candidates for Best/Great/Brilliant at a substantially deeper depth.
+  // V0.2.2 thermal-friendly selective verification. The V0.2.1 verifier
+  // produced better calibration, but routine Best candidates and broad tactical
+  // heuristics could cause a long sequence of depth-17 searches. That kept one
+  // CPU core saturated for too long. We now verify only moves likely to change
+  // the human-facing label, rank them by importance, cap the total work, and
+  // insert a short idle gap between deeper searches.
   const preset = ANALYSIS_PRESETS[options.quality];
-  const verifyPositions = new Map<number, number>();
+  const verifyPositions = new Map<number, VerifyTarget>();
   for (let i = 0; i < moves.length; i++) {
     const color = moves[i].source.color as 'w' | 'b';
     const rating = ratingFor(color, whiteElo, blackElo);
@@ -124,43 +150,65 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     const loss = expectedLoss(before.scoreCp, after.scoreCp, color, rating);
     const isBook = i < 28 && isLikelyBookMove(sans, i);
     const isBestCandidate = moves[i].uci === before.bestMove && !isBook;
-    const ambiguousNonBest = moves[i].uci !== before.bestMove && !isBook && loss >= 0.015;
-    const importantError = loss >= 0.065;
-    const cpSwing = Math.abs(before.scoreCp - after.scoreCp) >= 80;
     const mateCandidate = Boolean(before.mate || after.mate);
     const tacticalCandidate = movedPieceIsEnPrise(moves[i].fenAfter, moves[i].uci.slice(2, 4));
+    const legalCount = new Chess(moves[i].fenBefore).moves().length;
+    const beforeExpected = moverExpectedScore(before.scoreCp, color, rating);
+    const importantError = loss >= 0.10;
+    const meaningfulSwing = loss >= 0.045 && Math.abs(before.scoreCp - after.scoreCp) >= 90;
+    const boundaryCandidate = !isBook && moves[i].uci !== before.bestMove && nearClassificationBoundary(loss);
+    const specialBestCandidate = isBestCandidate
+      && beforeExpected >= 0.12
+      && beforeExpected <= 0.88
+      && (tacticalCandidate || mateCandidate || legalCount <= 4);
 
-    if (isBestCandidate) {
-      // Best/Great/Brilliant needs a deeper pre-move MultiPV comparison, but we
-      // do not need to re-search the post-move position just to decide whether
-      // the played move was Stockfish's top choice.
-      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV);
+    // Mate transitions are always worth checking and receive the highest priority.
+    if (mateCandidate) {
+      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV, 100);
+      addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1, 98);
+      continue;
     }
-    if (ambiguousNonBest || importantError || cpSwing || mateCandidate || tacticalCandidate) {
-      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV);
-      addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1);
+
+    // Large practical errors get a same-depth pre/post recheck, but do not need
+    // expensive MultiPV unless they also sit near a classification boundary.
+    if (importantError) {
+      addVerifyPosition(verifyPositions, i, positionFens.length, boundaryCandidate ? preset.reviewMultiPV : 1, 82 + Math.min(12, loss * 40));
+      addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1, 80 + Math.min(12, loss * 40));
+    } else if (boundaryCandidate || meaningfulSwing) {
+      addVerifyPosition(verifyPositions, i, positionFens.length, boundaryCandidate ? preset.reviewMultiPV : 1, 66);
+      addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1, 64);
+    }
+
+    // Routine Best moves are no longer all re-searched. Only plausible
+    // Great/Brilliant/Only-Move candidates get a deeper MultiPV comparison.
+    if (specialBestCandidate) {
+      addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV, tacticalCandidate ? 76 : 70);
     }
   }
 
-  const verifyList = [...verifyPositions.entries()].sort((a, b) => a[0] - b[0]);
+  const verifyList = [...verifyPositions.entries()]
+    .sort((a, b) => b[1].priority - a[1].priority || a[0] - b[0])
+    .slice(0, preset.reviewVerifyLimit);
+
   for (let n = 0; n < verifyList.length; n++) {
     if (options.signal?.aborted) {
       await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
       throw new DOMException('Analysis cancelled.', 'AbortError');
     }
-    const [positionIndex, multiPV] = verifyList[n];
+    const [positionIndex, target] = verifyList[n];
     options.onProgress?.({
       done: positionFens.length - 1,
       total: positionFens.length,
-      stage: `Verifying important position ${n + 1} of ${verifyList.length}`,
+      stage: `Verifying key position ${n + 1} of ${verifyList.length}`,
     });
     analyses[positionIndex] = await analyzePosition(
       positionFens[positionIndex],
       activeMode,
       options.quality,
-      multiPV,
+      target.multiPV,
       preset.reviewVerifyDepth,
     );
+    if (n + 1 < verifyList.length) await coolDown(preset.reviewVerifyPauseMs);
   }
 
   const reviewMoves: ReviewMove[] = moves.map((move, index) => {

@@ -126,3 +126,13 @@ The five games showed the same problems often enough to justify a model change:
 - too many Critical Moments in chaotic games
 
 V0.2.1 addresses those patterns with rating-aware expected score, selective deeper verification, stricter special-move rules, geometric-heavy accuracy, and improved opening metadata.
+
+## V0.2.1 follow-up — Game 5
+
+The first V0.2.1 rerun of Game 5 produced:
+
+- Reference accuracy: 57.5 / 31.8
+- V0.2 Full accuracy: 75.1 / 64.7
+- V0.2.1 Full accuracy: 53.6 / 42.7
+
+This was a major improvement, especially for White, but V0.2.1's deeper verifier caused sustained high CPU load during the verification phase. V0.2.2 therefore keeps the calibrated scoring/classification model while making verification bounded and thermal-friendly.

@@ -1,6 +1,6 @@
-# Chess Analyzer V0.2.1
+# Chess Analyzer V0.2.2
 
-**Current release:** 0.2.1
+**Current release:** 0.2.2
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.1.md`](UPDATE_NOTES_0.2.1.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.2.md`](UPDATE_NOTES_0.2.2.md).
 
 ## Calibration warning
 
@@ -86,6 +86,11 @@ They are not Chess.com's proprietary Game Review implementation.
 Application source: MIT (see `LICENSE`).
 
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
+
+
+## 0.2.2 thermal-friendly verification
+
+Version 0.2.2 keeps the V0.2.1 rating-aware calibration but fixes the sustained CPU spike during the second-pass verifier. Standard now verifies only the most consequential positions, caps deeper rechecks, lowers verification depth from 17 to 15, avoids re-searching routine Best moves, uses MultiPV only where it can change a special/threshold decision, and inserts a short idle gap between verification searches. Full NNUE remains the default engine. See `UPDATE_NOTES_0.2.2.md`.
 
 ## 0.2.1 calibrated analyzer
 

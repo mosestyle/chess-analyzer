@@ -8,10 +8,10 @@ async function text(path) {
   return readFile(new URL(path, root), 'utf8');
 }
 
-test('package declares Stockfish 18 and V0.2.1', async () => {
+test('package declares Stockfish 18 and V0.2.2', async () => {
   const pkg = JSON.parse(await text('package.json'));
   assert.equal(pkg.dependencies.stockfish, '18.0.8');
-  assert.equal(pkg.version, '0.2.1');
+  assert.equal(pkg.version, '0.2.2');
 });
 
 test('desktop review keeps engine scroll and anchored navigation', async () => {
@@ -24,7 +24,7 @@ test('desktop review keeps engine scroll and anchored navigation', async () => {
   assert.match(css, /\.active-review \.review-side \.prev-next[\s\S]*grid-area: nav/);
 });
 
-test('V0.2.1 uses rating-aware expected score and selective verification', async () => {
+test('V0.2.2 keeps rating-aware expected score and thermal-friendly verification', async () => {
   const classification = await text('src/analysis/classification.ts');
   const analyzer = await text('src/analysis/analyzeGame.ts');
   const presets = await text('src/engine/presets.ts');
@@ -32,12 +32,17 @@ test('V0.2.1 uses rating-aware expected score and selective verification', async
   assert.match(classification, /rating = DEFAULT_RATING/);
   assert.match(analyzer, /WhiteElo/);
   assert.match(analyzer, /BlackElo/);
-  assert.match(analyzer, /verifyPositions/);
-  assert.match(analyzer, /reviewVerifyDepth/);
-  assert.match(presets, /reviewVerifyDepth: 17/);
+  assert.match(analyzer, /nearClassificationBoundary/);
+  assert.match(analyzer, /specialBestCandidate/);
+  assert.match(analyzer, /slice\(0, preset\.reviewVerifyLimit\)/);
+  assert.match(analyzer, /await coolDown\(preset\.reviewVerifyPauseMs\)/);
+  assert.match(analyzer, /hash: 16/);
+  assert.match(presets, /reviewVerifyDepth: 15/);
+  assert.match(presets, /reviewVerifyLimit: 10/);
+  assert.match(presets, /reviewVerifyPauseMs: 160/);
 });
 
-test('V0.2.1 accuracy uses geometric aggregation and class caps', async () => {
+test('V0.2.1 calibrated accuracy model remains in V0.2.2', async () => {
   const accuracy = await text('src/analysis/accuracy.ts');
   assert.match(accuracy, /CLASS_CAP/);
   assert.match(accuracy, /Math\.log/);
