@@ -1,4 +1,5 @@
 CHESS ANALYZER V0.2.0 — START HERE
+BUILD-FIXED PACKAGE: includes the PlayPage TypeScript fix for the first V0.2 GitHub Actions failure.
 
 UPDATING AN EXISTING GITHUB REPOSITORY
 1. Extract this ZIP.

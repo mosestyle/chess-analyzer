@@ -2,6 +2,11 @@
 
 V0.2 is the first analyzer-quality release. It also fixes the desktop Game Review layout issue where longer commentary or extra engine lines moved the Previous/Next controls vertically.
 
+## Build fix included
+
+The GitHub Actions TypeScript failure reported after the first V0.2 upload is fixed. Practice Mode in `PlayPage.tsx` now passes the V0.2 classifier/explanation fields (`legalCount`, `beforeCp`, `afterCp`, `fenAfter`, and reply-line/mate context) required by the updated analyzer APIs.
+
+
 ## Desktop Game Review layout fix
 
 The right-side review panel now uses a fixed board-height grid:

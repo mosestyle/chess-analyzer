@@ -115,6 +115,9 @@ export function PlayPage({ settings, setSettings, onBack, onReview }: {
         : await engine.analyze(afterFen, { movetime: 180, multiPV: 1, skillLevel: 20, hash: 16 });
       const color = moved.color as 'w' | 'b';
       const loss = expectedLoss(before.scoreCp, after.scoreCp, color);
+      const legalCount = new Chess(beforeFen).moves().length;
+      const afterLines = 'lines' in after ? after.lines : [];
+      const afterMate = 'mate' in after ? after.mate : undefined;
       const classification = classifyMove({
         loss,
         actualUci: moveToUci(moved),
@@ -126,11 +129,35 @@ export function PlayPage({ settings, setSettings, onBack, onReview }: {
         fenAfter: afterFen,
         piece: moved.piece,
         captured: moved.captured,
+        legalCount,
+        beforeCp: before.scoreCp,
+        afterCp: after.scoreCp,
       });
-      const tags = specialTags({ loss, beforeCp: before.scoreCp, afterCp: after.scoreCp, color, lines: before.lines, bestUci: before.bestMove, actualUci: moveToUci(moved), classification });
+      const tags = specialTags({
+        loss,
+        beforeCp: before.scoreCp,
+        afterCp: after.scoreCp,
+        beforeMate: before.mate,
+        afterMate,
+        color,
+        lines: before.lines,
+        bestUci: before.bestMove,
+        actualUci: moveToUci(moved),
+        classification,
+      });
       setFeedback({
         classification,
-        text: explainMove({ classification, tags, san: moved.san, bestMove: before.bestMove, fenBefore: beforeFen, beforeCp: before.scoreCp, afterCp: after.scoreCp }),
+        text: explainMove({
+          classification,
+          tags,
+          san: moved.san,
+          bestMove: before.bestMove,
+          fenBefore: beforeFen,
+          fenAfter: afterFen,
+          beforeCp: before.scoreCp,
+          afterCp: after.scoreCp,
+          replyLine: afterLines[0]?.pv || [],
+        }),
       });
     } catch {
       setFeedback(null);

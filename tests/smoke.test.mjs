@@ -32,3 +32,13 @@ test('V0.2 classification thresholds and color-aware mate logic are present', as
   assert.match(classification, /loss <= 0\.20/);
   assert.match(classification, /mateForColor/);
 });
+
+
+test('Play Practice Mode uses the complete V0.2 classifier/explanation contract', async () => {
+  const play = await text('src/pages/PlayPage.tsx');
+  assert.match(play, /legalCount,/);
+  assert.match(play, /beforeCp: before\.scoreCp/);
+  assert.match(play, /afterCp: after\.scoreCp/);
+  assert.match(play, /fenAfter: afterFen/);
+  assert.match(play, /replyLine: afterLines\[0\]\?\.pv \|\| \[\]/);
+});
