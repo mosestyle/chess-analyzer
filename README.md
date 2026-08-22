@@ -1,5 +1,7 @@
 # Chess Analyzer V1
 
+https://mosestyle.github.io/chess-analyzer/
+
 **Current patch:** 0.1.1
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
