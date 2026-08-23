@@ -1,17 +1,16 @@
 import type { ReviewMove } from '../types';
-import { DEFAULT_RATING, clamp, ratingAccuracyMultiplier } from './calibration';
+import { ACCURACY_MODEL, DEFAULT_RATING, clamp, ratingAccuracyMultiplier } from './calibration';
 
 /**
  * Stable CAPS2-like scoring layer for Analyzer Engine V2.
  * Accuracy is derived from raw win-probability loss, not from the displayed
- * category. This prevents changing Miss/Great labels from moving game Accuracy.
+ * category. V0.3.1 reads its tunable values from calibration-model.json.
  */
 export function moveAccuracy(dropPct: number, rating = DEFAULT_RATING) {
   const adjusted = Math.max(0, dropPct) * ratingAccuracyMultiplier(rating);
-  // Smooth school-grade-like curve: 0 loss -> 100; medium drops fall quickly;
-  // severe drops approach zero without a hard category-dependent cliff.
-  const raw = 102.8 * Math.exp(-0.056 * adjusted) - 2.8;
-  return clamp(raw, 0.5, 100);
+  const a = ACCURACY_MODEL;
+  const raw = a.curveScale * Math.exp(-a.curveDecay * adjusted) + a.curveOffset;
+  return clamp(raw, a.scoreFloor, 100);
 }
 
 function harmonicMean(values: number[]) {
@@ -28,16 +27,15 @@ function powerMean(values: number[], p: number, floor = 4) {
 
 function aggregateAccuracy(moves: ReviewMove[]) {
   if (!moves.length) return 100;
+  const a = ACCURACY_MODEL;
   const values = moves.map((move) => moveAccuracy(move.winPctLoss ?? move.expectedLoss * 100, move.ratingUsed));
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
   const harmonic = harmonicMean(values);
-  const power = powerMean(values, -1.55, 5);
-  const badFraction = values.filter((v) => v < 50).length / values.length;
+  const power = powerMean(values, a.powerP, a.powerFloor);
+  const badFraction = values.filter((v) => v < a.badMoveThreshold).length / values.length;
 
-  // A robust blend: quiet 100s cannot completely hide repeated bad moves, while
-  // one isolated tactical disaster does not reduce an otherwise clean game to 0.
-  let score = 0.28 * mean + 0.32 * harmonic + 0.40 * power;
-  score -= Math.max(0, badFraction - 0.10) * 10;
+  let score = a.meanWeight * mean + a.harmonicWeight * harmonic + a.powerWeight * power;
+  score -= Math.max(0, badFraction - a.badFractionGrace) * a.badFractionPenalty;
   return Math.round(clamp(score, 0, 100) * 10) / 10;
 }
 

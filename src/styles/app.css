@@ -514,3 +514,20 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
     padding-inline: 8px;
   }
 }
+
+/* V0.3.1 development-only calibration export. Hidden unless ?calibration=1. */
+.summary-meta-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.calibration-export-button {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.calibration-export-button:hover { color: var(--text); border-color: var(--accent); }
+@media (max-width: 760px) {
+  .summary-meta-actions { justify-content: flex-start; }
+}

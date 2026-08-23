@@ -158,7 +158,7 @@ export function applyRelationalClassifications(moves: ReviewMove[]) {
     if (
       move.isEngineTop
       && move.isSacrifice
-      && (move.winPctLoss ?? 99) < 2
+      && (move.winPctLoss ?? 99) < RELATIONAL.specialMaxLoss
       && beforeWin < RELATIONAL.brilliantMaxWinBefore
       && afterWin >= RELATIONAL.brilliantMinWinAfter
       && (prevMistake || (!previousMistakeSignal(previous) && prevPrevMistake) || (afterMate != null && afterMate > 0))
@@ -175,7 +175,7 @@ export function applyRelationalClassifications(moves: ReviewMove[]) {
       && !previousWasMiss
       && prevMistake
       && gain >= RELATIONAL.greatMinOpportunityGain
-      && (move.winPctLoss ?? 99) < 2
+      && (move.winPctLoss ?? 99) < RELATIONAL.specialMaxLoss
       && afterWin >= beforeWin - 1
     ) {
       move.classification = 'Great';
@@ -206,7 +206,7 @@ export function applyRelationalClassifications(moves: ReviewMove[]) {
       && prevMistake
       && gain >= RELATIONAL.missMinOpportunityGain
       && missEligible
-      && (move.winPctLoss ?? 0) >= 4
+      && (move.winPctLoss ?? 0) >= RELATIONAL.missMinMoveLoss
       && (move.cpLoss ?? 0) <= (previous.cpLoss ?? 0) + RELATIONAL.missToleranceCp
     ) {
       move.classification = 'Miss';

@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 async function text(path) { return readFile(new URL(path, root), 'utf8'); }
 
-test('package declares Stockfish 18 and V0.3', async () => {
+test('package declares Stockfish 18 and V0.3.1', async () => {
   const pkg = JSON.parse(await text('package.json'));
   assert.equal(pkg.dependencies.stockfish, '18.0.8');
-  assert.equal(pkg.version, '0.3.0');
+  assert.equal(pkg.version, '0.3.1');
 });
 
 test('desktop review keeps engine scroll and anchored navigation', async () => {
@@ -46,12 +46,12 @@ test('Analyzer V2 separates raw evidence from displayed labels', async () => {
 });
 
 test('ordinary classification uses Expected Points 2/5/10/20 bands', async () => {
-  const calibration = await text('src/analysis/calibration.ts');
+  const calibration = await text('src/analysis/calibration-model.json');
   const classification = await text('src/analysis/classification.ts');
-  assert.match(calibration, /excellent: 2/);
-  assert.match(calibration, /good: 5/);
-  assert.match(calibration, /inaccuracy: 10/);
-  assert.match(calibration, /mistake: 20/);
+  assert.match(calibration, /\"excellent\": 2/);
+  assert.match(calibration, /\"good\": 5/);
+  assert.match(calibration, /\"inaccuracy\": 10/);
+  assert.match(calibration, /\"mistake\": 20/);
   assert.match(classification, /standardClassification/);
 });
 

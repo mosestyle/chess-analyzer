@@ -201,3 +201,7 @@ After V0.2.4 continued to move individual labels around between releases, V0.3 s
 The engine measurement contract is frozen first (fixed nodes, MultiPV 1, one pass). Only after that should calibration constants or relational rules be adjusted. Accuracy is based on raw win-probability loss and is independent of final category labels.
 
 T-Julsgaard/Chess-Review is used as an architectural benchmark only; its GPL source and calibration file are not copied into this repository.
+
+## V0.3.1 objective calibration framework
+
+V0.3.1 stops changing runtime thresholds by hand. The engine profile from V0.3 is frozen, tunable parameters are centralized in `src/analysis/calibration-model.json`, exact Chess.com `$1/$2/$4/$6/$9` move labels are extracted for development only, and raw browser feature exports feed a deterministic fitter with leave-one-game-out cross-validation. See `CALIBRATION_FRAMEWORK.md` for the current workflow. `CONTINUATION_PROMPT.md` must be updated on future releases so the calibration state is not lost between chats.

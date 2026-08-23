@@ -205,6 +205,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       winPctAfter: moverWinPercent(after.scoreCp, color, rating),
       cpLoss,
       isEngineTop,
+      isBook,
       legalCount,
       isSacrifice: isSoundSacrificeCandidate({
         fenBefore: move.fenBefore,

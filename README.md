@@ -1,6 +1,6 @@
-# Chess Analyzer V0.3
+# Chess Analyzer V0.3.1
 
-**Current release:** 0.3.0
+**Current release:** 0.3.1
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.3.0.md`](UPDATE_NOTES_0.3.0.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.3.1.md`](UPDATE_NOTES_0.3.1.md).
 
 ## Calibration warning
 
@@ -87,6 +87,11 @@ Application source: MIT (see `LICENSE`).
 
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
 
+
+
+## 0.3.1 Calibration Framework
+
+V0.3.1 keeps the V0.3 engine profile frozen and adds objective calibration tooling instead of another hand-tuned classifier patch. Tunable parameters live in `src/analysis/calibration-model.json`. Development-only tooling can extract Chess.com NAG reference labels, export per-move raw evidence, benchmark exact labelled moves and summary targets, perform automated fitting with leave-one-game-out cross-validation, and detect future regressions. Open the deployed site with `?calibration=1` to expose the calibration export button. See `UPDATE_NOTES_0.3.1.md`, `docs/CALIBRATION_FRAMEWORK.md`, and `CONTINUATION_PROMPT.md`.
 
 ## 0.3 Analyzer Engine V2
 

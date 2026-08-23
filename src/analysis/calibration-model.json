@@ -1,0 +1,46 @@
+{
+  "modelVersion": "v2.1-framework",
+  "engineProfile": "sf18-full-standard-48000n-multipv1",
+  "expectedPoints": {
+    "baseWinK": 0.00315,
+    "ratingIntercept": 0.86,
+    "ratingDivisor": 9000,
+    "ratingFactorMin": 0.87,
+    "ratingFactorMax": 1.12
+  },
+  "bands": {
+    "excellent": 2,
+    "good": 5,
+    "inaccuracy": 10,
+    "mistake": 20
+  },
+  "relational": {
+    "clearAdvantageCp": 200,
+    "mistakeMinCpLoss": 120,
+    "missToleranceCp": 50,
+    "missMinOpportunityGain": 5,
+    "missMinMoveLoss": 4,
+    "brilliantMaxWinBefore": 88,
+    "brilliantMinWinAfter": 48,
+    "greatMinOpportunityGain": 12,
+    "specialMaxLoss": 2
+  },
+  "accuracy": {
+    "ratingReference": 1900,
+    "ratingSlope": 0.00012,
+    "multiplierMin": 0.84,
+    "multiplierMax": 1.24,
+    "curveScale": 102.8,
+    "curveDecay": 0.056,
+    "curveOffset": -2.8,
+    "scoreFloor": 0.5,
+    "meanWeight": 0.28,
+    "harmonicWeight": 0.32,
+    "powerWeight": 0.4,
+    "powerP": -1.55,
+    "powerFloor": 5,
+    "badMoveThreshold": 50,
+    "badFractionGrace": 0.1,
+    "badFractionPenalty": 10
+  }
+}

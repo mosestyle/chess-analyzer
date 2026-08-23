@@ -47,3 +47,7 @@ Accuracy is deliberately independent of the displayed label. It uses move-level 
 - The five supplied comparison PGNs remain the first validation corpus.
 
 V0.3 does not import or execute Chess-Review code and does not use embedded Chess.com NAGs at runtime.
+
+## V0.3.1 calibration layer
+
+The Stockfish measurement profile remains unchanged from V0.3. Tunable model values now live in `src/analysis/calibration-model.json`. Development-only calibration exports and scripts are documented in `CALIBRATION_FRAMEWORK.md`. Chess.com NAG reference labels are never consumed by `analyzePgn()`.

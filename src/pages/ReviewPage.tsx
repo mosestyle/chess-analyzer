@@ -9,6 +9,7 @@ import { playChessSound } from '../services/sound';
 import { phaseAccuracies } from '../analysis/accuracy';
 import type { Classification, GameReview, Settings } from '../types';
 import { ANALYSIS_PRESETS } from '../engine/presets';
+import { calibrationModeEnabled, downloadCalibrationExport } from '../analysis/calibrationDiagnostics';
 
 const ORDER: Classification[] = ['Brilliant', 'Great', 'Best', 'Excellent', 'Good', 'Book', 'Inaccuracy', 'Mistake', 'Miss', 'Blunder'];
 type ReviewView = 'summary' | 'review';
@@ -26,6 +27,7 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
   const [showBest, setShowBest] = useState(false);
   const [retry, setRetry] = useState(false);
   const [retryMessage, setRetryMessage] = useState('');
+  const calibrationMode = calibrationModeEnabled();
 
   const safeIndex = Math.max(0, Math.min(review.moves.length - 1, index));
   const current = review.moves[safeIndex];
@@ -111,7 +113,12 @@ export function ReviewPage({ review, settings, view, onViewChange, index, onInde
           <section className="summary-hero panel">
             <div className="summary-kicker-row">
               <p className="eyebrow">ANALYSIS COMPLETE</p>
-              <span className="analysis-meta">{review.engineMode === 'full' ? 'Stockfish 18 Full NNUE' : 'Stockfish 18 Lite'} · {ANALYSIS_PRESETS[review.analysisQuality].label}</span>
+              <div className="summary-meta-actions">
+                <span className="analysis-meta">{review.engineMode === 'full' ? 'Stockfish 18 Full NNUE' : 'Stockfish 18 Lite'} · {ANALYSIS_PRESETS[review.analysisQuality].label}</span>
+                {calibrationMode && (
+                  <button className="calibration-export-button" onClick={() => downloadCalibrationExport(review)}>Export calibration JSON</button>
+                )}
+              </div>
             </div>
             <h2>{review.whiteName} vs {review.blackName}</h2>
             <p>{review.opening}</p>

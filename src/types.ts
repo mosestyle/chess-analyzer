@@ -59,6 +59,7 @@ export interface ReviewMove {
   winPctAfter?: number;
   cpLoss?: number;
   isEngineTop?: boolean;
+  isBook?: boolean;
   legalCount?: number;
   isSacrifice?: boolean;
   ratingUsed?: number;
