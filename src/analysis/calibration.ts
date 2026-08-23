@@ -3,8 +3,8 @@ import model from './calibration-model.json';
 /**
  * Analyzer Engine V2 calibration model.
  *
- * V0.3.1 moves all tunable parameters into calibration-model.json so the
- * development fitter and the runtime consume the same model schema. The
+ * V0.3.2 keeps the frozen expected-points parameters in calibration-model.json while the
+ * data-calibrated classifier lives in a separate generated model. The
  * browser never reads Chess.com NAGs as answers; labelled PGNs are only used
  * by development/export tooling.
  */

@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 async function text(path) { return readFile(new URL(path, root), 'utf8'); }
 
-test('package declares Stockfish 18 and V0.3.1', async () => {
+test('package declares Stockfish 18 and V0.3.2', async () => {
   const pkg = JSON.parse(await text('package.json'));
   assert.equal(pkg.dependencies.stockfish, '18.0.8');
-  assert.equal(pkg.version, '0.3.1');
+  assert.equal(pkg.version, '0.3.2');
 });
 
 test('desktop review keeps engine scroll and anchored navigation', async () => {
@@ -45,41 +45,45 @@ test('Analyzer V2 separates raw evidence from displayed labels', async () => {
   assert.match(analyzer, /applyRelationalClassifications\(reviewMoves\)/);
 });
 
-test('ordinary classification uses Expected Points 2/5/10/20 bands', async () => {
+test('ordinary 2/5/10/20 bands remain as raw diagnostic evidence', async () => {
   const calibration = await text('src/analysis/calibration-model.json');
   const classification = await text('src/analysis/classification.ts');
-  assert.match(calibration, /\"excellent\": 2/);
-  assert.match(calibration, /\"good\": 5/);
-  assert.match(calibration, /\"inaccuracy\": 10/);
-  assert.match(calibration, /\"mistake\": 20/);
+  assert.match(calibration, /"excellent": 2/);
+  assert.match(calibration, /"good": 5/);
+  assert.match(calibration, /"inaccuracy": 10/);
+  assert.match(calibration, /"mistake": 20/);
   assert.match(classification, /standardClassification/);
 });
 
-test('Best is reserved for the engine top move or forced move', async () => {
+test('full Game Review uses the learned two-stage classifier', async () => {
+  const classifier = await text('src/analysis/dataCalibratedClassifier.ts');
   const classification = await text('src/analysis/classification.ts');
-  assert.match(classification, /if \(isTop\) return 'Best'/);
-  assert.match(classification, /legalCount <= 1/);
+  assert.match(classifier, /gateForest/);
+  assert.match(classifier, /errorForest/);
+  assert.match(classifier, /calibratedErrorClassification/);
+  assert.match(classification, /calibratedErrorClassification\(move, previous\)/);
+  assert.match(classification, /calibratedNonErrorClassification\(move\)/);
 });
 
-test('special categories are relational', async () => {
+test('Great and Brilliant remain deliberately conservative special categories', async () => {
   const classification = await text('src/analysis/classification.ts');
-  assert.match(classification, /isSoundSacrificeCandidate/);
-  assert.match(classification, /previousMistakeSignal/);
-  assert.match(classification, /opportunityGain/);
+  const classifier = await text('src/analysis/dataCalibratedClassifier.ts');
   assert.match(classification, /move\.classification = 'Brilliant'/);
+  assert.match(classifier, /calibratedGreatCandidate/);
   assert.match(classification, /move\.classification = 'Great'/);
-  assert.match(classification, /move\.classification = 'Miss'/);
+  assert.match(classification, /beforeMate != null && beforeMate > 0/);
 });
 
-test('Accuracy V2 is independent of displayed classification', async () => {
+test('Accuracy is calibrated from raw evidence and remains independent of displayed label', async () => {
   const accuracy = await text('src/analysis/accuracy.ts');
-  assert.match(accuracy, /move\.winPctLoss/);
-  assert.doesNotMatch(accuracy, /classification\]/);
-  assert.match(accuracy, /harmonicMean/);
-  assert.match(accuracy, /powerMean/);
+  assert.match(accuracy, /rawAggregateAccuracy/);
+  assert.match(accuracy, /data-calibrated-model\.json/);
+  assert.match(accuracy, /meanLoss/);
+  assert.match(accuracy, /p90Loss/);
+  assert.doesNotMatch(accuracy, /move\.classification/);
 });
 
-test('calibration fixtures contain all five comparison games', async () => {
+test('calibration fixtures contain all five Chess.com comparison games', async () => {
   const games = JSON.parse(await text('tests/fixtures/calibration-games.json'));
   assert.equal(games.length, 5);
   assert.deepEqual(games.map((g) => g.id), ['game-1', 'game-2', 'game-3', 'game-4', 'game-5']);
@@ -91,7 +95,9 @@ test('calibration fixtures contain all five comparison games', async () => {
 
 test('runtime does not read Chess.com NAGs as answers', async () => {
   const analyzer = await text('src/analysis/analyzeGame.ts');
+  const classifier = await text('src/analysis/dataCalibratedClassifier.ts');
   assert.doesNotMatch(analyzer, /\$1|\$2|\$4|\$6|\$9/);
+  assert.doesNotMatch(classifier, /\$1|\$2|\$4|\$6|\$9/);
 });
 
 test('analysis summary still shows engine and quality metadata', async () => {
@@ -100,7 +106,7 @@ test('analysis summary still shows engine and quality metadata', async () => {
   assert.match(review, /ANALYSIS_PRESETS\[review\.analysisQuality\]\.label/);
 });
 
-test('opening metadata supports ECOUrl calibration lines', async () => {
+test('opening metadata still supports ECOUrl calibration lines', async () => {
   const openings = await text('src/chess/openings.ts');
   assert.match(openings, /openingFromHeaders/);
   assert.match(openings, /ECOUrl/);
@@ -108,7 +114,7 @@ test('opening metadata supports ECOUrl calibration lines', async () => {
   assert.match(openings, /French Defense: Queen's Knight Variation/);
 });
 
-test('Play Practice Mode remains compatible with V2 classifier', async () => {
+test('Play Practice Mode remains compatible with context-free classifier', async () => {
   const play = await text('src/pages/PlayPage.tsx');
   assert.match(play, /legalCount,/);
   assert.match(play, /beforeMate: before\.mate/);

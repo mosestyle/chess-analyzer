@@ -51,3 +51,7 @@ V0.3 does not import or execute Chess-Review code and does not use embedded Ches
 ## V0.3.1 calibration layer
 
 The Stockfish measurement profile remains unchanged from V0.3. Tunable model values now live in `src/analysis/calibration-model.json`. Development-only calibration exports and scripts are documented in `CALIBRATION_FRAMEWORK.md`. Chess.com NAG reference labels are never consumed by `analyzePgn()`.
+
+## V0.3.2 data-calibrated classification layer
+
+V0.3.2 leaves the Stockfish measurement profile unchanged and replaces most hand-written error-category logic with a generated two-stage supervised classifier. The first model decides error-family vs non-error-family; the second chooses Inaccuracy/Mistake/Miss/Blunder. The model consumes only frozen raw engine features. Great is intentionally conservative and Brilliant remains rule-based until the corpus contains enough positive examples. Accuracy gains a separate regularized game-level calibration model. See `DATA_CALIBRATED_CLASSIFIER.md` and `CALIBRATION_RESULTS_V0.3.2.md`.

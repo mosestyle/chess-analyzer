@@ -1,5 +1,5 @@
 {
-  "modelVersion": "v2.1-framework",
+  "modelVersion": "v2.2-data-calibrated",
   "engineProfile": "sf18-full-standard-48000n-multipv1",
   "expectedPoints": {
     "baseWinK": 0.00315,

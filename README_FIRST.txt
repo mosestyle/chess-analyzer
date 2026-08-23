@@ -1,22 +1,24 @@
-CHESS ANALYZER V0.3.1 — START HERE
+CHESS ANALYZER V0.3.2 — START HERE
 
 This ZIP is the COMPLETE GitHub-ready project.
 
 UPDATE AN EXISTING REPOSITORY
-1. Keep the hidden .git folder in your local repository.
-2. Delete the other old project files.
-3. Copy everything from this V0.3.1 ZIP into the repository folder.
-4. Open GitHub Desktop.
-5. Commit: Update to V0.3.1
-6. Push origin.
-7. Wait for GitHub Actions / Pages to finish.
-8. Hard-refresh the site once.
+1. Keep your existing repository and hidden .git folder.
+2. Copy everything from this V0.3.2 ZIP into the repository folder.
+3. When Windows asks, choose Replace the files in the destination.
+4. You do NOT need to delete the old files first for this update.
+5. Open GitHub Desktop.
+6. Commit: Update to V0.3.2
+7. Push origin.
+8. Wait for GitHub Actions / Pages to finish.
+9. Hard-refresh the site once.
 
-V0.3.1 IMPORTANT CHANGE
-The V0.3 engine profile remains frozen: Standard uses one 48,000-node Stockfish 18 pass per position and NO verification stage.
-V0.3.1 adds the objective calibration framework: exact Chess.com NAG extraction for development only, raw feature export, automated fitting, cross-validation, metrics, and regression protection.
+V0.3.2 IMPORTANT CHANGE
+The Stockfish measurement layer is unchanged: Standard remains one 48,000-node Stockfish 18 Full NNUE pass per position, MultiPV 1, and NO verification stage.
 
-CALIBRATION MODE
-Append ?calibration=1 to the deployed site URL. After analyzing a known reference game, Analysis Complete shows a development-only "Export calibration JSON" button.
+V0.3.2 applies the new data-calibrated two-stage classifier trained from the five V0.3.1 browser exports, plus a calibrated game-level Accuracy model.
 
-See UPDATE_NOTES_0.3.1.md, docs/CALIBRATION_FRAMEWORK.md, and CONTINUATION_PROMPT.md.
+DEVELOPMENT CALIBRATION MODE
+Append ?calibration=1 to the deployed site URL to expose the calibration export button. Normal visitors do not see it.
+
+See UPDATE_NOTES_0.3.2.md, CALIBRATION_RESULTS_V0.3.2.md, docs/DATA_CALIBRATED_CLASSIFIER.md, and CONTINUATION_PROMPT.md.

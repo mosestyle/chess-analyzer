@@ -1,7 +1,7 @@
 {
   "name": "chess-analyzer-v1",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "scripts": {
     "prepare-engines": "node scripts/prepare-stockfish.mjs",
@@ -15,9 +15,10 @@
     "calibration:extract": "node scripts/calibration/extract-reference.mjs",
     "calibration:benchmark": "node scripts/calibration/benchmark-model.mjs",
     "calibration:fit": "node scripts/calibration/fit-model.mjs",
-    "calibration:check": "node scripts/calibration/check-regression.mjs",
+    "calibration:check": "node scripts/calibration/benchmark-supervised.mjs --check",
     "calibration:accept": "node scripts/calibration/accept-baseline.mjs",
-    "calibration:import-chess-review": "node scripts/calibration/import-chess-review.mjs"
+    "calibration:import-chess-review": "node scripts/calibration/import-chess-review.mjs",
+    "calibration:supervised": "node scripts/calibration/benchmark-supervised.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0",

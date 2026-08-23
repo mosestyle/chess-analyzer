@@ -9,6 +9,7 @@ import {
   moverWinPercent,
   winPercentDrop,
 } from './calibration';
+import { calibratedErrorClassification, calibratedGreatCandidate, calibratedNonErrorClassification } from './dataCalibratedClassifier';
 
 export { expectedLoss, moverWinPercent } from './calibration';
 
@@ -148,13 +149,11 @@ export function applyRelationalClassifications(moves: ReviewMove[]) {
     if (move.classification === 'Book') continue;
     if ((move.legalCount ?? 2) <= 1) { move.classification = 'Best'; continue; }
 
+    // Brilliant remains intentionally conservative until the calibration corpus
+    // contains exact Brilliant references. This preserves a chess-sound
+    // sacrifice rule instead of training a class with zero positive examples.
     const prevMistake = previousMistakeSignal(previous);
     const prevPrevMistake = previousMistakeSignal(previousPrevious);
-    const gain = previous ? opportunityGain(previous, move) : 0;
-    const previousWasMiss = previous?.classification === 'Miss';
-
-    // Brilliant: exact top move + sound voluntary sacrifice + very small loss,
-    // normally in response to a recent error. Keep this intentionally rare.
     if (
       move.isEngineTop
       && move.isSacrifice
@@ -167,71 +166,27 @@ export function applyRelationalClassifications(moves: ReviewMove[]) {
       continue;
     }
 
-    // Great: an exact engine-top response that meaningfully cashes in on an
-    // opponent error or rescues/changes the practical result. Requiring both a
-    // real opportunity gain and the top engine move keeps Great uncommon.
-    if (
-      move.isEngineTop
-      && !previousWasMiss
-      && prevMistake
-      && gain >= RELATIONAL.greatMinOpportunityGain
-      && (move.winPctLoss ?? 99) < RELATIONAL.specialMaxLoss
-      && afterWin >= beforeWin - 1
-    ) {
+    // Great is a deliberately narrow calibrated rule in V0.3.2. The current
+    // corpus has only one exact Great reference, so false positives are more
+    // damaging than conservatively returning Best.
+    if (calibratedGreatCandidate(move, previous)) {
       move.classification = 'Great';
       continue;
     }
 
-    // The engine's actual #1 move is always Best unless upgraded above.
-    if (move.isEngineTop) {
-      move.classification = 'Best';
-      continue;
-    }
-
-    // Missing a forced mate is always a Miss.
+    // Missing a known forced mate is deterministic chess evidence and remains
+    // an explicit Miss even before the learned error-family classifier.
     if (beforeMate != null && beforeMate > 0 && (afterMate == null || afterMate <= 0)) {
       move.classification = 'Miss';
       continue;
     }
 
-    // Miss: opponent just made a punishable error and this move gives back a
-    // comparable amount of the opportunity. This relational cp-loss test is
-    // much more stable than the V0.2.x outcome-threshold overrides.
-    const missEligible = move.standardClassification === 'Inaccuracy'
-      || move.standardClassification === 'Mistake'
-      || move.standardClassification === 'Blunder';
-    if (
-      !previousWasMiss
-      && previous
-      && prevMistake
-      && gain >= RELATIONAL.missMinOpportunityGain
-      && missEligible
-      && (move.winPctLoss ?? 0) >= RELATIONAL.missMinMoveLoss
-      && (move.cpLoss ?? 0) <= (previous.cpLoss ?? 0) + RELATIONAL.missToleranceCp
-    ) {
-      move.classification = 'Miss';
-      continue;
-    }
-
-    // Contextual Mistake: a nominal Inaccuracy that throws away/cedes a clear
-    // ~2-pawn advantage is more consequential than the raw drop bucket suggests.
-    if (
-      move.standardClassification === 'Inaccuracy'
-      && (move.cpLoss ?? 0) >= RELATIONAL.mistakeMinCpLoss
-      && crossesClearAdvantage(move)
-    ) {
-      move.classification = 'Mistake';
-      continue;
-    }
-
-    // Mate transitions need explicit handling because cp saturation can hide
-    // their severity in an ordinary logistic bucket.
-    if ((beforeMate == null || beforeMate >= 0) && afterMate != null && afterMate < 0) {
-      move.classification = moverCp(move.evalBefore, move.color) > -RELATIONAL.clearAdvantageCp ? 'Mistake' : 'Blunder';
-      continue;
-    }
-
-    move.classification = move.standardClassification ?? move.classification;
+    // V0.3.2 data-calibrated two-stage model:
+    //   1) error-family vs non-error-family gate
+    //   2) Inaccuracy/Mistake/Miss/Blunder classifier
+    // The model consumes only raw features from the frozen Stockfish pass.
+    const errorLabel = calibratedErrorClassification(move, previous);
+    move.classification = errorLabel ?? calibratedNonErrorClassification(move);
   }
 }
 

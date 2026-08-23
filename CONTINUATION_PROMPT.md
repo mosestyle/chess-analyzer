@@ -1,34 +1,34 @@
 # Chess Analyzer — Continuation Prompt
 
-**CURRENT VERSION: V0.3.1 — Calibration Framework**
+**CURRENT VERSION: V0.3.2 — Data-Calibrated Classifier**
 
-> IMPORTANT FOR FUTURE UPDATES: Update this file whenever the project version, architecture, calibration workflow, unresolved bugs, or next planned milestone changes. This file is meant to be pasted into a new ChatGPT chat to continue the project without losing context.
+> IMPORTANT FOR FUTURE UPDATES: Update this file whenever the project version, architecture, calibration results, unresolved bugs, or next planned milestone changes. This file is intended to be pasted into a new ChatGPT chat so development can continue without losing context.
 
 ## Paste this into a new chat
 
-We are continuing development of my open-source **Chess Analyzer / Game Review** project. Please treat the information below as the current source of truth and continue from it rather than restarting the design.
+We are continuing development of my open-source **Chess Analyzer / Game Review** project. Treat the information below as the current source of truth and continue from it rather than restarting the design.
 
 ### Product goal
 
-Build a GitHub-hosted, responsive desktop/mobile/tablet chess analyzer that feels similar in usefulness to Chess.com Game Review, while remaining an independent implementation. Main focus is the analyzer. Secondary feature is Play vs Computer with Stockfish difficulty levels 1–12.
+Build a GitHub-hosted responsive desktop/mobile/tablet chess analyzer that feels similar in usefulness to Chess.com Game Review, while remaining an independent implementation. Main focus is the analyzer. Secondary feature is Play vs Computer with Stockfish difficulty levels 1–12.
 
-The user wants the move classifications and Accuracy to become **as close to Chess.com as reasonably possible for the right reasons**, not by hard-coding individual game answers.
+The user wants classifications and Accuracy to become **as close to Chess.com as reasonably possible for the right reasons**, not by hard-coding individual game answers.
 
 ### Hosting / server decision
 
-- Keep the analyzer **local/browser based for now**.
+- Keep analysis **local/browser based** for now.
 - Do NOT move analysis to a server unless the user revisits that decision.
 - GitHub Pages deployment currently works well.
 
 ### Engine options
 
-- Stockfish 18 Full NNUE and Stockfish 18 Lite are both supported.
+- Stockfish 18 Full NNUE and Stockfish 18 Lite are supported.
 - Full NNUE is the preferred/default analyzer engine.
-- Calibration/reference testing must use **Stockfish 18 Full NNUE + Standard**.
+- Calibration/reference testing uses **Stockfish 18 Full NNUE + Standard**.
 
 ### Frozen Analyzer V2 engine profile
 
-V0.3 introduced Analyzer Engine V2. Do not casually alter the Standard measurement profile during calibration:
+Do not casually alter the Standard measurement profile while calibrating labels:
 
 - Stockfish 18 Full NNUE
 - Standard full-game review: **48,000 nodes per position**
@@ -38,45 +38,113 @@ V0.3 introduced Analyzer Engine V2. Do not casually alter the Standard measureme
 - small cooperative pause between positions
 - **NO separate verification/re-analysis stage**
 
-This replaced V0.2.1/V0.2.2's heavy `Verifying important position X of 10` stage, which caused large CPU-temperature spikes. Performance/thermals are currently much better and this part should remain frozen while calibrating labels.
+This replaced the V0.2.x heavy verification stage that caused CPU-temperature spikes. Performance/thermals improved and this measurement layer is deliberately frozen.
 
-### Why V0.3.1 exists
+## What happened in V0.3.1
 
-V0.2.x repeatedly hand-tuned thresholds. Fixing one game often broke another. V0.3 stabilized Stockfish measurements, but Game #3 still showed substantial label/Accuracy differences from Chess.com.
+V0.3.1 introduced a calibration framework and gathered five real browser exports using the frozen engine profile. Those five exports have already been supplied and processed. Do **not** ask the user to re-export them unless the engine profile or feature schema changes.
 
-V0.3.1 therefore adds a proper calibration framework instead of another threshold patch.
+V0.3.1 baseline from those exports:
 
-### V0.3.1 calibration architecture
+- exact annotated-label agreement: **51.0%**
+- summary-count MAE: **1.30 moves/category**
+- Accuracy MAE: **10.29 points**
 
-Runtime raw evidence is separated from the displayed label. Each reviewed move stores evidence including:
+The old random parameter fitter improved the five-game training fit but worsened held-out exact labels, proving it was overfitting. It was rejected.
 
-- FEN before/after
-- Stockfish evaluation before/after
-- best move
-- played move
-- centipawn loss
-- win/expected-points loss
-- rating used
-- mate before/after
-- legal move count
+## V0.3.2 architecture
+
+V0.3.2 keeps Stockfish unchanged and replaces most hand-written error-label guessing with a **two-stage supervised calibration model** generated from raw browser evidence.
+
+Runtime flow:
+
+1. Frozen Stockfish 18 Full NNUE Standard measurement pass.
+2. Store raw per-move evidence.
+3. Preserve Book / forced-move handling and a conservative Brilliant rule.
+4. Very conservative Great gate because the current corpus has only one exact Great example.
+5. **Stage 1:** learned error-family vs non-error-family random-forest gate.
+6. **Stage 2:** learned Inaccuracy / Mistake / Miss / Blunder random-forest classifier.
+7. Non-error moves are split into Best / Excellent / Good with a separately calibrated summary layer.
+8. Accuracy is derived from raw move-loss evidence and passed through a regularized game-level calibration model.
+
+The runtime model is stored in:
+
+- `src/analysis/data-calibrated-model.json`
+- `src/analysis/dataCalibratedClassifier.ts`
+
+The older expected-points model remains in:
+
+- `src/analysis/calibration-model.json`
+
+Its engine profile is unchanged, but its model version is now `v2.2-data-calibrated`.
+
+### Runtime model features
+
+The learned classifier uses only raw evidence from the frozen Stockfish pass, including:
+
+- win-percentage loss
+- capped/log centipawn loss
+- win percentage before/after
+- mover rating
 - engine-top flag
-- book flag
-- sacrifice candidate
-- ordinary baseline category
+- legal move count
+- previous move loss
+- opportunity gain created by the opponent's preceding move
+- mate-before / mate-after flags
+- move number
 
-Tunable parameters are centralized in:
+It does **not** read Chess.com labels at runtime.
 
-`src/analysis/calibration-model.json`
+### Accuracy V0.3.2
 
-Do not scatter new magic numbers across the classifier.
+Accuracy no longer relies only on the old aggregate formula. V0.3.2 first computes the unchanged raw Analyzer-V2 aggregate, then applies a regularized linear calibration using raw game features such as:
 
-### Chess.com labelled data
+- mean/median/p75/p90 win-percentage loss
+- fractions of moves losing >=5/10/20 percentage points
+- rating
+- game length
+- Stockfish-top-move fraction
 
-Five calibration PGNs are stored in:
+The fitted coefficients are stored inside `data-calibrated-model.json`.
+
+## V0.3.2 measured calibration results
+
+The new runtime benchmark script is:
+
+`npm run calibration:supervised`
+
+The GitHub regression gate runs:
+
+`npm run calibration:check`
+
+Measured on the five known calibration games after fitting on all five:
+
+- exact annotated labels: **89.8% (88/98)**
+- exact annotated error labels: **89.7% (87/97)**
+- summary-count MAE: **0.76 moves/category**
+- Accuracy MAE: **0.67 points**
+
+More important generalization checks from leave-one-game-out validation during model selection:
+
+- error-gate + error-family / non-error exact agreement: **83.3%**
+- Accuracy MAE: **2.88 points**
+
+These held-out numbers matter more than the near-perfect fit on the five training games.
+
+### Remaining uncertainty
+
+- **Great:** only one exact Great reference currently exists. V0.3.2 intentionally prefers false negatives over many false Great labels.
+- **Brilliant:** the five-game corpus has zero exact Brilliant examples, so Brilliant remains a conservative sound-sacrifice rule rather than a learned class.
+- **Best / Excellent / Good:** Chess.com PGNs do not expose exact per-move labels for these categories. They are calibrated from summary counts and therefore remain less certain than the exact NAG-labelled error categories.
+- The model is optimized for Full NNUE + Standard. Quick/Lite/Deep/Maximum may drift because their raw engine evidence is not the calibration profile.
+
+## Chess.com labelled data
+
+Five reference PGNs are stored in:
 
 `tests/fixtures/calibration-games.json`
 
-The Chess.com PGNs contain exact NAG annotations for important labels:
+Chess.com NAG annotations give exact development labels:
 
 - `$1` = Great
 - `$2` = Mistake
@@ -84,54 +152,15 @@ The Chess.com PGNs contain exact NAG annotations for important labels:
 - `$6` = Inaccuracy
 - `$9` = Miss
 
-These labels are **development/test ground truth only**. The runtime analyzer must never read them as answers. Best/Excellent/Good/Book and Accuracy targets come from the saved Chess.com summary data in the fixtures.
+These are **development/test ground truth only**. Runtime analysis must never consume them as answers.
 
-`npm run calibration:extract` creates the normalized exact reference file.
+Derived browser-feature fixture used by the V0.3.2 regression benchmark:
 
-### Calibration export workflow
+`tests/fixtures/calibration-features-v0.3.1.json`
 
-To gather raw Stockfish evidence from the deployed site:
+This fixture contains raw engine evidence and development reference labels, not a runtime lookup table.
 
-1. Open the site with `?calibration=1` appended to the URL.
-2. Analyze a known reference PGN with Full NNUE + Standard.
-3. On Analysis Complete, use the development-only `Export calibration JSON` button.
-4. Put the export into `calibration-data/features/`.
-
-The website normally hides this button.
-
-### Calibration scripts
-
-- `npm run calibration:extract` — extract exact NAG labels/fingerprints from fixtures.
-- `npm run calibration:benchmark` — benchmark the current model against available feature exports.
-- `npm run calibration:fit` — deterministic automated parameter search.
-- `npm run calibration:fit -- --iterations=3000` — larger fit.
-- `npm run calibration:fit -- --iterations=3000 --apply` — apply only after validation improves.
-- `npm run calibration:accept` — save accepted benchmark metrics.
-- `npm run calibration:check` — detect future regression.
-- `npm run calibration:import-chess-review -- <file>` — import third-party benchmark OUTPUT only.
-
-The fitter performs **leave-one-game-out cross-validation**. Do not accept a model because one reference game gets closer if held-out games regress.
-
-### Benchmark metrics
-
-We care about:
-
-- exact annotated-move label agreement
-- precision/recall for Great, Inaccuracy, Mistake, Miss, Blunder
-- summary-count MAE across all categories
-- Accuracy MAE
-- held-out/cross-validation results
-
-Future model changes should be judged quantitatively.
-
-### Chess-Review project
-
-Reference project:
-`T-Julsgaard/Chess-Review`
-
-Use it as architectural/secondary benchmark inspiration, especially its calibration-oriented approach. Do **not** blindly copy its GPL source or calibration file into this project. V0.3.1 includes an importer for separately produced benchmark output only.
-
-### Current five Chess.com reference summaries
+## Current five Chess.com reference summaries
 
 Game #1 — Mosestyle vs Maria-BOT, 65 plies
 - Accuracy: 77.7 / 68.8
@@ -140,71 +169,72 @@ Game #1 — Mosestyle vs Maria-BOT, 65 plies
 
 Game #2 — Maria-BOT vs Mosestyle, 25 plies
 - Accuracy: 69.9 / 71.6
-- White: 0,0,Book3,Best1,Excellent2,Good3,Inaccuracy3,Mistake1,Miss0,Blunder0
-- Black: 0,0,Book3,Best5,Excellent1,Good0,Inaccuracy2,Mistake0,Miss0,Blunder1
+- White: Brilliant0, Great0, Book3, Best1, Excellent2, Good3, Inaccuracy3, Mistake1, Miss0, Blunder0
+- Black: Brilliant0, Great0, Book3, Best5, Excellent1, Good0, Inaccuracy2, Mistake0, Miss0, Blunder1
 
 Game #3 — Maria-BOT vs Mosestyle, 98 plies
 - Accuracy: 34.7 / 40.6
-- White: Brilliant 0, Great 1, Book 3, Best 9, Excellent 3, Good 5, Inaccuracy 11, Mistake 2, Miss 8, Blunder 6
-- Black: Brilliant 0, Great 0, Book 2, Best 12, Excellent 5, Good 8, Inaccuracy 5, Mistake 4, Miss 7, Blunder 3
+- White: Brilliant0, Great1, Book3, Best9, Excellent3, Good5, Inaccuracy11, Mistake2, Miss8, Blunder6
+- Black: Brilliant0, Great0, Book2, Best12, Excellent5, Good8, Inaccuracy5, Mistake4, Miss7, Blunder3
 
 Game #4 — Maria-BOT vs Mosestyle, 76 plies
 - Accuracy: 71.5 / 79.3
-- White: 0,0,Book3,Best13,Excellent4,Good5,Inaccuracy6,Mistake5,Miss0,Blunder0
-- Black: 0,0,Book2,Best13,Excellent9,Good11,Inaccuracy2,Mistake0,Miss1,Blunder0
+- White: Brilliant0, Great0, Book3, Best13, Excellent4, Good5, Inaccuracy6, Mistake5, Miss0, Blunder0
+- Black: Brilliant0, Great0, Book2, Best13, Excellent9, Good11, Inaccuracy2, Mistake0, Miss1, Blunder0
 
 Game #5 — Maria-BOT vs Mosestyle, 25 plies
 - Accuracy: 57.5 / 31.8
-- White: 0,0,Book4,Best4,Excellent0,Good0,Inaccuracy2,Mistake1,Miss1,Blunder1
-- Black: 0,0,Book3,Best1,Excellent0,Good2,Inaccuracy1,Mistake1,Miss2,Blunder2
+- White: Brilliant0, Great0, Book4, Best4, Excellent0, Good0, Inaccuracy2, Mistake1, Miss1, Blunder1
+- Black: Brilliant0, Great0, Book3, Best1, Excellent0, Good2, Inaccuracy1, Mistake1, Miss2, Blunder2
 
-The exact PGNs are already in the fixture JSON; do not ask the user to retype them if the project files are available.
+The exact PGNs are already in project fixtures. Do not ask the user to retype them if the project files are available.
 
-### Last known V0.3 Game #3 result (before calibration framework)
+## Chess-Review project
 
-V0.3 Full NNUE + Standard produced roughly:
-- Maria Accuracy 28.4; Great1, Best10, Excellent5, Good9, Book3, Inaccuracy2, Mistake5, Miss6, Blunder8
-- Mosestyle Accuracy 30.8; Great2, Best13, Excellent8, Good7, Book2, Inaccuracy3, Mistake5, Miss5, Blunder4
+Reference project: `T-Julsgaard/Chess-Review`.
 
-This proved the stable engine pipeline worked but the interpretation model still needed objective calibration.
+Use it only as architectural/secondary benchmark inspiration. Do **not** copy its GPL source or calibration file into this project. The V0.3.x implementation is independent.
 
-### UI/features already implemented
+## UI/features already implemented
 
 - PGN full-game review and FEN analysis
 - Full NNUE / Lite selector
 - Quick / Standard / Deep / Maximum quality
 - responsive desktop/mobile/tablet layout
-- modern SVG chess pieces
-- smooth piece movement animation
-- sound settings
-- evaluation graph + graph toggle
+- SVG chess pieces and smooth movement animation
+- sounds/settings
+- evaluation graph + toggle
 - engine lines
 - Show Best / Retry
-- keyboard left/right navigation on desktop
-- mobile arrows directly below the board
-- settings returns to the exact review state
+- keyboard desktop navigation + mobile arrows
+- settings returns to exact review state
 - Analysis Complete engine/quality badge
-- opening/ECO metadata support
-- Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder
+- opening/ECO metadata
+- all Game Review categories
 - Critical Moments and special tags
-- Play vs Computer, difficulty 1–12, practice/hints/takeback/casual flows
-- PWA/GitHub Pages deployment
+- Play vs Computer levels 1–12, practice/hints/takeback/casual flows
+- local-first PWA / GitHub Pages
+- development-only calibration export via `?calibration=1`
 
-### Current immediate next step
+## Immediate next step after deploying V0.3.2
 
-Do NOT make another manual threshold patch.
+1. Deploy V0.3.2 without changing the frozen engine profile.
+2. Retest **Game #3 first** with Full NNUE + Standard.
+3. Compare the visible summary to Chess.com's Game #3 reference, especially Miss / Blunder / Mistake / Inaccuracy and Accuracy.
+4. If Game #3 looks materially closer and performance remains good, rerun Games #1–#5 once for runtime confirmation.
+5. Then expand the calibration corpus with additional Chess.com-reviewed games, especially games containing Great and Brilliant moves and a wider range of ratings.
+6. Do not hand-tune one game in isolation. Refit/revalidate using grouped hold-outs whenever the corpus changes.
 
-First gather V0.3.1 raw feature exports for the five saved reference games, then run the benchmark/fitter. Review leave-one-game-out results. Apply a fitted model only when held-out metrics improve. After accepting it, rerun the five games and compare to Chess.com.
+## Continuation-file maintenance
 
-### Continuation-file maintenance
+Whenever a later version is created, update this `CONTINUATION_PROMPT.md` with:
 
-Whenever you create V0.3.2, V0.4, etc., update this `CONTINUATION_PROMPT.md` with:
-
-- new version
-- architecture changes
-- new benchmark/baseline metrics
+- current version
+- architecture/model changes
+- latest benchmark and held-out metrics
+- newly supplied calibration games
 - resolved/unresolved issues
 - exact next step
-- any changed user decisions
+- changed user decisions
 
 Do not let this file become stale.

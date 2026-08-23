@@ -1,6 +1,6 @@
-# Chess Analyzer V0.3.1
+# Chess Analyzer V0.3.2
 
-**Current release:** 0.3.1
+**Current release:** 0.3.2
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.3.1.md`](UPDATE_NOTES_0.3.1.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.3.2.md`](UPDATE_NOTES_0.3.2.md).
 
 ## Calibration warning
 
@@ -88,6 +88,11 @@ Application source: MIT (see `LICENSE`).
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
 
 
+
+
+## 0.3.2 Data-Calibrated Classifier
+
+V0.3.2 keeps the frozen Analyzer V2 engine profile and applies a supervised two-stage classifier trained from the five V0.3.1 browser exports. A learned gate separates error-family moves from non-error moves, then a second model distinguishes Inaccuracy / Mistake / Miss / Blunder. Great remains deliberately conservative because the current corpus has only one exact Great example, and Brilliant remains a conservative sound-sacrifice rule because there are no exact Brilliant examples yet. Accuracy now adds a regularized game-level calibration over raw loss statistics. The deterministic benchmark is available through `npm run calibration:supervised`; the GitHub regression gate uses `npm run calibration:check`. See `UPDATE_NOTES_0.3.2.md`, `CALIBRATION_RESULTS_V0.3.2.md`, `docs/DATA_CALIBRATED_CLASSIFIER.md`, and `CONTINUATION_PROMPT.md`.
 
 ## 0.3.1 Calibration Framework
 

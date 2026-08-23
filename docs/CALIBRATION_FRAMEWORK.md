@@ -141,3 +141,7 @@ This stores normalized benchmark output under `calibration-data/chess-review/`. 
 Do not accept a model merely because one game looks better.
 
 A candidate should improve the aggregate benchmark and the leave-one-game-out validation. If it fixes Game #3 but materially worsens a held-out Game #5, it should be rejected.
+
+## V0.3.2 status
+
+The first supervised model has now been accepted into runtime. The original V0.3.1 random parameter fitter remains available for experiments, but `npm run calibration:check` now benchmarks the generated V0.3.2 classifier directly against the derived five-game raw-feature fixture. Future corpus expansion should preserve grouped hold-out validation and regenerate the model rather than editing individual forest thresholds or hand-patching a single reference game.

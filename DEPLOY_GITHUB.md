@@ -45,6 +45,6 @@ The Full NNUE WASM build is over 100 MB. Keeping it out of the repository avoids
 
 ## Updating an existing deployment
 
-For an update such as 0.3.1, upload/commit the new project contents over the existing repository and keep the same GitHub Pages settings. The included GitHub Actions workflow will rebuild and redeploy automatically.
+For an update such as 0.3.2, upload/commit the new project contents over the existing repository and keep the same GitHub Pages settings. The included GitHub Actions workflow will rebuild and redeploy automatically.
 
-Because this patch changes the service-worker cache version, refresh the site once after the deployment finishes. If a browser still shows the old interface, close the installed PWA/tab and reopen it, or perform one hard refresh.
+You can copy/replace the new project files over the existing repository; deleting everything first is not required. Because this patch changes the service-worker cache version, refresh the site once after the deployment finishes. If a browser still shows the old interface, close the installed PWA/tab and reopen it, or perform one hard refresh.

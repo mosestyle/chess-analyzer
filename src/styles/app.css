@@ -515,7 +515,7 @@ select { background: var(--surface-2); color: var(--text); border: 1px solid var
   }
 }
 
-/* V0.3.1 development-only calibration export. Hidden unless ?calibration=1. */
+/* Development-only calibration export. Hidden unless ?calibration=1. */
 .summary-meta-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .calibration-export-button {
   border: 1px dashed var(--border);

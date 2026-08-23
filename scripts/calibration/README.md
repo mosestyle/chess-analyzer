@@ -8,3 +8,5 @@ These tools are development-only. Runtime analysis never consumes Chess.com NAGs
 - `check-regression.mjs`: fail when an accepted benchmark materially regresses.
 - `accept-baseline.mjs`: record a benchmark as the accepted regression baseline.
 - `import-chess-review.mjs`: import third-party benchmark OUTPUT only; no Chess-Review source code is copied or executed.
+
+- `benchmark-supervised.mjs`: deterministic V0.3.2 runtime-model benchmark over the derived five-game feature fixture; `--check` enables regression gates.

@@ -205,3 +205,9 @@ T-Julsgaard/Chess-Review is used as an architectural benchmark only; its GPL sou
 ## V0.3.1 objective calibration framework
 
 V0.3.1 stops changing runtime thresholds by hand. The engine profile from V0.3 is frozen, tunable parameters are centralized in `src/analysis/calibration-model.json`, exact Chess.com `$1/$2/$4/$6/$9` move labels are extracted for development only, and raw browser feature exports feed a deterministic fitter with leave-one-game-out cross-validation. See `CALIBRATION_FRAMEWORK.md` for the current workflow. `CONTINUATION_PROMPT.md` must be updated on future releases so the calibration state is not lost between chats.
+
+## V0.3.2 supervised calibration result
+
+The five V0.3.1 browser exports were used to train a two-stage random-forest classifier on raw move evidence. Grouped leave-one-game-out model selection reached 83.3% exact agreement across the learned error/non-error target family, while the regularized Accuracy model reached 2.88 points MAE on held-out games. The final model fitted on all five current games reaches 89.7% exact agreement on the 97 exact error-labelled moves, 0.76 summary-count MAE, and 0.67 Accuracy MAE on the calibration corpus. These training-fit figures must never replace the held-out metrics when deciding whether a future model genuinely improves.
+
+The generated runtime model is stored in `src/analysis/data-calibrated-model.json`. Runtime analysis never reads Chess.com NAG annotations.

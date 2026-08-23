@@ -36,6 +36,6 @@ attribution/license information when redistributing the piece files.
 
 ## Chess-Review methodology reference
 
-V0.3/V0.3.1 were designed after reviewing the public T-Julsgaard/Chess-Review project as an architectural benchmark for local calibration (stable engine settings, single-PV classification, calibration/regression workflow). Chess-Review is GPL-3.0 licensed. No Chess-Review source code, calibration JSON, images, sounds, or other assets are copied or bundled in this project. V0.3.1 can import separately produced benchmark output as secondary comparison data; this does not copy or execute the Chess-Review implementation.
+V0.3/V0.3.1/V0.3.2 were designed after reviewing the public T-Julsgaard/Chess-Review project as an architectural benchmark for local calibration (stable engine settings, single-PV classification, calibration/regression workflow). Chess-Review is GPL-3.0 licensed. No Chess-Review source code, calibration JSON, images, sounds, or other assets are copied or bundled in this project. The calibration tooling can import separately produced benchmark output as secondary comparison data; this does not copy or execute the Chess-Review implementation.
 
 Upstream reference: https://github.com/T-Julsgaard/Chess-Review

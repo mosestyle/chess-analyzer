@@ -1,5 +1,6 @@
 import type { Classification, GameReview, ReviewMove } from '../types';
 import { ANALYZER_MODEL_VERSION, CALIBRATION_MODEL } from './calibration';
+import { DATA_CALIBRATED_MODEL_VERSION } from './dataCalibratedClassifier';
 
 export const CHESSCOM_NAG_LABELS: Record<number, Classification> = {
   1: 'Great',
@@ -139,8 +140,9 @@ export function buildCalibrationExport(review: GameReview) {
   const refs = new Map(extractChessComNagLabels(review.pgn).map((ref) => [ref.ply, ref]));
   return {
     schemaVersion: 1,
-    analyzerVersion: '0.3.1',
+    analyzerVersion: '0.3.2',
     analyzerModelVersion: ANALYZER_MODEL_VERSION,
+    classificationModelVersion: DATA_CALIBRATED_MODEL_VERSION,
     calibrationModel: CALIBRATION_MODEL,
     fingerprint: pgnFingerprint(review.pgn),
     exportedAt: new Date().toISOString(),
