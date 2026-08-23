@@ -1,4 +1,4 @@
-CHESS ANALYZER V0.2.3 — START HERE
+CHESS ANALYZER V0.2.4 — START HERE
 CALIBRATION + PERFORMANCE RELEASE: includes the five-game V0.2.2 follow-up calibration and restores a much cooler/faster Standard verification path.
 
 UPDATING AN EXISTING GITHUB REPOSITORY
@@ -26,4 +26,4 @@ For local development:
   npm install
   npm run dev
 
-See UPDATE_NOTES_0.2.3.md for this release's calibration + cool Standard changes. Earlier update notes remain included for history.
+See UPDATE_NOTES_0.2.4.md for this release's Chess.com-style calibration changes. Earlier update notes remain included for history.

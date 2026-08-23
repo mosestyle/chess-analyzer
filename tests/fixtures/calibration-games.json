@@ -1,0 +1,157 @@
+[
+  {
+    "id": "game-1",
+    "label": "Mosestyle vs Maria-BOT",
+    "whiteAccuracy": 77.7,
+    "blackAccuracy": 68.8,
+    "whiteCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 2,
+      "Best": 10,
+      "Excellent": 12,
+      "Good": 4,
+      "Inaccuracy": 4,
+      "Mistake": 0,
+      "Miss": 1,
+      "Blunder": 0
+    },
+    "blackCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 1,
+      "Best": 10,
+      "Excellent": 2,
+      "Good": 5,
+      "Inaccuracy": 5,
+      "Mistake": 9,
+      "Miss": 0,
+      "Blunder": 0
+    },
+    "pgn": "[Event \"Play vs Bot\"]\n[Site \"Chess.com\"]\n[Date \"2026.08.22\"]\n[White \"Mosestyle\"]\n[Black \"Maria-BOT\"]\n[Result \"1-0\"]\n[WhiteElo \"217\"]\n[BlackElo \"1000\"]\n[ECO \"C00\"]\n[ECOUrl \"https://www.chess.com/openings/French-Defense-Queens-Knight-Variation\"]\n\n1. e4 e6 2. Nc3 Nh6 $6 3. Nf3 Nc6 4. Be2 d5 5. exd5 $6 exd5 6. O-O Qd6 $6 7. Re1 Qd8 $2 8. Nb5 $9 Bd6 $6 9. Bd3+ $6 Kf8 $2 10. Qe2 $6 Bf4 11. b3 Bd6 $6 12. Bb2 Bg4 13. c4 f6 14. cxd5 Be5 $6 15. Ba3+ Kg8 $2 16. Rac1 $6 Bb2 $2 17. Bxb2 Qxd5 $2 18. Nxc7 Qxd3 $2 19. Qxd3 Nf7 $2 20. Nxa8 Nd6 $2 21. Qxd6 Bc8 $2 22. Qc7 Be6 23. Qxb7 a6 24. Rxe6 h6 25. Rcxc6 Kh7 26. Qf7 a5 27. Re7 Rg8 28. Nc7 Kh8 29. Ne8 a4 30. bxa4 Kh7 31. Bxf6 Kh8 32. Bxg7+ Kh7 33. Nf6# 1-0"
+  },
+  {
+    "id": "game-2",
+    "label": "Maria-BOT vs Mosestyle (Ponziani)",
+    "whiteAccuracy": 69.9,
+    "blackAccuracy": 71.6,
+    "whiteCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 3,
+      "Best": 1,
+      "Excellent": 2,
+      "Good": 3,
+      "Inaccuracy": 3,
+      "Mistake": 1,
+      "Miss": 0,
+      "Blunder": 0
+    },
+    "blackCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 3,
+      "Best": 5,
+      "Excellent": 1,
+      "Good": 0,
+      "Inaccuracy": 2,
+      "Mistake": 0,
+      "Miss": 0,
+      "Blunder": 1
+    },
+    "pgn": "[Event \"Play vs Bot\"]\n[Site \"Chess.com\"]\n[Date \"2026.08.20\"]\n[White \"Maria-BOT\"]\n[Black \"Mosestyle\"]\n[Result \"1-0\"]\n[WhiteElo \"1000\"]\n[BlackElo \"217\"]\n[ECO \"C44\"]\n[ECOUrl \"https://www.chess.com/openings/Ponziani-Opening-Jaenisch-Neumann-Gambit\"]\n\n1. e4 e5 2. Nf3 Nc6 3. c3 Nf6 4. Bc4 $6 Nxe4 5. d3 Nf6 6. d4 exd4 7. Bxf7+ $2 Kxf7 8. a4 $6 Bd6 $6 9. Qb3+ Ke7 10. a5 Re8 $6 11. cxd4 Kf8+ 12. Ne5 $6 Nxd4 $4 13. Qf7# 1-0"
+  },
+  {
+    "id": "game-3",
+    "label": "Maria-BOT vs Mosestyle (King's Gambit)",
+    "whiteAccuracy": 34.7,
+    "blackAccuracy": 40.6,
+    "whiteCounts": {
+      "Brilliant": 0,
+      "Great": 1,
+      "Book": 3,
+      "Best": 9,
+      "Excellent": 3,
+      "Good": 5,
+      "Inaccuracy": 11,
+      "Mistake": 2,
+      "Miss": 8,
+      "Blunder": 6
+    },
+    "blackCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 2,
+      "Best": 12,
+      "Excellent": 5,
+      "Good": 8,
+      "Inaccuracy": 5,
+      "Mistake": 4,
+      "Miss": 7,
+      "Blunder": 3
+    },
+    "pgn": "[Event \"Play vs Bot\"]\n[Site \"Chess.com\"]\n[Date \"2026.08.19\"]\n[White \"Maria-BOT\"]\n[Black \"Mosestyle\"]\n[Result \"0-1\"]\n[WhiteElo \"1000\"]\n[BlackElo \"217\"]\n[ECO \"C30\"]\n[ECOUrl \"https://www.chess.com/openings/Kings-Gambit-Declined-Keene-Defense-3.g3\"]\n\n1. e4 e5 2. f4 Qh4+ 3. g3 Qf6 4. Qh5 $6 exf4 5. Qf5 $2 Qd4 $2 6. Bg2 $6 Qd6 $6 7. Bh3 $9 fxg3 8. e5 $6 Qc5 9. Ne2 Ne7 10. Qf3 gxh2 $6 11. d4 Qc6 12. Qg2 $6 Nd5 $2 13. Qf1 $9 Bb4+ $9 14. Nec3 $4 O-O $9 15. Rxh2 $6 Re8 $2 16. Bd2 $6 d6 $6 17. Bxc8 Rxc8 $6 18. Qh3 Re8 $6 19. Qxh7+ Kf8 20. Qh8+ $6 Ke7 21. Nxd5+ $9 Kd8 $4 22. Qh4+ $1 Kd7 23. Qg4+ Kd8 24. Nxb4 Qb5 25. Qh4+ Re7 26. Qh8+ $6 Re8 27. Qh4+ Re7 28. Qh8+ $6 Re8 29. Qh3 dxe5 30. Bg5+ Re7 $2 31. a4 $9 Qxb4+ 32. Qc3 $4 Qd6 $9 33. Qa3 $9 Qg6 $4 34. Bxe7+ $9 Kd7 35. Qa2 $4 Kxe7 $9 36. Qc4 $4 Qg3+ $9 37. Kd1 $4 Qxh2 $9 38. Kc1 $9 Qh1+ 39. Kd2 exd4 40. Qxc7+ Ke8 $4 41. Qc8+ Ke7 42. Qc7+ $4 Ke8 $9 43. Kd3 $9 Nc6 44. Kd2 $6 Rd8 45. Qg3 d3 46. Qxg7 $2 dxc2+ 47. Ke3 $6 c1=Q+ 48. Kf2 Qhf1+ 49. Kg3 Qcf4# 0-1"
+  },
+  {
+    "id": "game-4",
+    "label": "Maria-BOT vs Mosestyle (Ruy Lopez)",
+    "whiteAccuracy": 71.5,
+    "blackAccuracy": 79.3,
+    "whiteCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 3,
+      "Best": 13,
+      "Excellent": 4,
+      "Good": 5,
+      "Inaccuracy": 6,
+      "Mistake": 5,
+      "Miss": 0,
+      "Blunder": 0
+    },
+    "blackCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 2,
+      "Best": 13,
+      "Excellent": 9,
+      "Good": 11,
+      "Inaccuracy": 2,
+      "Mistake": 0,
+      "Miss": 1,
+      "Blunder": 0
+    },
+    "pgn": "[Event \"Play vs Bot\"]\n[Site \"Chess.com\"]\n[Date \"2026.07.25\"]\n[White \"Maria-BOT\"]\n[Black \"Mosestyle\"]\n[Result \"0-1\"]\n[WhiteElo \"1000\"]\n[BlackElo \"217\"]\n[ECO \"C60\"]\n[ECOUrl \"https://www.chess.com/openings/Ruy-Lopez-Opening-Vinogradov-Variation\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 Qe7 $6 4. Bxc6 $6 bxc6 5. Rf1 $2 Rb8 $6 6. Ng1 $6 Nf6 7. Ne2 $6 Nxe4 8. d4 d6 9. Nd2 Qh4 10. Nxe4 Qxe4 11. Bg5 f6 12. Qc1 $2 fxg5 13. Kd2 $6 Rb4 14. Ke1 Be7 15. Kd2 $6 O-O 16. c4 Ba6 17. Qc3 $2 Rxc4 18. Rfd1 $6 Rxc3 19. Kxc3 Qxe2 20. b3 Qxf2 21. Rac1 $2 d5 22. Rb1 c5 23. Rd2 cxd4+ 24. Kc2 Qf5+ 25. Kb2 Qe4 26. b4 Bxb4 27. Rc2 Qd3 28. g4 Rf3 29. Rd1 $2 Qxd1 30. a4 Bc3+ 31. Rxc3 dxc3+ 32. Ka2 Qd2+ 33. Kb3 Rf4 34. h3 c2 $9 35. h4 c1=Q 36. h5 Qd3+ 37. Ka2 Qcc2+ 38. Ka1 Rf1# 0-1"
+  },
+  {
+    "id": "game-5",
+    "label": "Maria-BOT vs Mosestyle (Italian)",
+    "whiteAccuracy": 57.5,
+    "blackAccuracy": 31.8,
+    "whiteCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 4,
+      "Best": 4,
+      "Excellent": 0,
+      "Good": 0,
+      "Inaccuracy": 2,
+      "Mistake": 1,
+      "Miss": 1,
+      "Blunder": 1
+    },
+    "blackCounts": {
+      "Brilliant": 0,
+      "Great": 0,
+      "Book": 3,
+      "Best": 1,
+      "Excellent": 0,
+      "Good": 2,
+      "Inaccuracy": 1,
+      "Mistake": 1,
+      "Miss": 2,
+      "Blunder": 2
+    },
+    "pgn": "[Event \"Play vs Bot\"]\n[Site \"Chess.com\"]\n[Date \"2026.07.18\"]\n[White \"Maria-BOT\"]\n[Black \"Mosestyle\"]\n[Result \"1-0\"]\n[WhiteElo \"1000\"]\n[BlackElo \"100\"]\n[ECO \"C55\"]\n[ECOUrl \"https://www.chess.com/openings/Italian-Game-Two-Knights-Open-4...Nxe4\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. Qd3 $2 Nd6 $6 6. Bd2 $4 exd4 $9 7. O-O $6 Nb4 $4 8. Bxf7+ $9 Kxf7 $9 9. Bxb4 $6 Nf5 $4 10. Qxf5+ Ke8 11. Re1+ Be7 12. Bxe7 Rf8 $2 13. Qxf8# 1-0"
+  }
+]

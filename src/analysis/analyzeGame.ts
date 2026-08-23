@@ -4,7 +4,7 @@ import { ANALYSIS_PRESETS } from '../engine/presets';
 import type { AnalysisQuality, Classification, EngineAnalysis, EngineMode, GameReview, ReviewMove } from '../types';
 import { START_FEN, moveToUci, movedPieceIsEnPrise } from '../chess/helpers';
 import { detectOpening, isLikelyBookMove } from '../chess/openings';
-import { CLASSIFICATION_BANDS, classifyMove, expectedLoss, moverExpectedScore, specialTags } from './classification';
+import { CLASSIFICATION_BANDS, classifyMove, expectedLoss, moverExpectedScore, specialTags, winningExpectedThreshold } from './classification';
 import { sideAccuracy } from './accuracy';
 import { explainMove } from './explanations';
 
@@ -113,7 +113,7 @@ function trimCriticalMoments(moves: ReviewMove[]) {
   // V0.2.2 could label a third of a chaotic game as Critical. Keep Critical as a
   // useful review-navigation concept by retaining only the most consequential
   // moments. The cap scales gently with game length.
-  const limit = Math.max(3, Math.min(10, Math.ceil(moves.length / 12)));
+  const limit = Math.max(3, Math.min(8, Math.ceil(moves.length / 16)));
   const candidates = moves
     .map((move, index) => ({ move, index, score: criticalPriority(move) }))
     .filter(({ move, score }) => move.tags.includes('Critical Moment') || score >= 60)
@@ -181,7 +181,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality, 1));
   }
 
-  // V0.2.3 restores Standard's V0.2.0-like thermal behavior. Standard no longer
+  // V0.2.4 keeps the cool V0.2.3 verification path. Standard no longer
   // rechecks ordinary errors or every boundary candidate. It may perform at most
   // two very short time-bounded searches for mate or special-best ambiguity.
   // Deep/Maximum retain a broader verification path by explicit user choice.
@@ -240,7 +240,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     options.onProgress?.({
       done: positionFens.length - 1,
       total: positionFens.length,
-      stage: `Checking critical position ${n + 1} of ${verifyList.length}`,
+      stage: `Refining special position ${n + 1} of ${verifyList.length}`,
     });
     analyses[positionIndex] = await analyzePosition(
       positionFens[positionIndex],
@@ -324,28 +324,35 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     return review;
   });
 
-  // V0.2.3 Miss calibration: a Miss is not simply "a bad move after an opponent
-  // error". The opponent must have created a concrete opportunity, and the
-  // player must give back a meaningful share of it. Blunders remain Blunders,
-  // and a previous Miss cannot create a chain of new Miss labels.
+  // V0.2.4 Miss calibration follows the published meaning much more closely:
+  // the opponent must create a *new winning opportunity*, and the player must
+  // then fail to keep that winning status. This avoids both V0.2.2's Miss
+  // inflation and V0.2.3's over-correction where many real Misses became
+  // Blunders. NAG annotations in imported PGNs are intentionally ignored.
   for (let i = 1; i < reviewMoves.length; i++) {
     const previous = reviewMoves[i - 1];
     const current = reviewMoves[i];
     const rating = ratingFor(current.color, whiteElo, blackElo);
+    const win = winningExpectedThreshold(rating);
     const beforeOpponentMove = moverExpectedScore(previous.evalBefore, current.color, rating);
-    const afterOpponentMove = moverExpectedScore(current.evalBefore, current.color, rating);
-    const opportunityGain = Math.max(0, afterOpponentMove - beforeOpponentMove);
-    const previousWasRealError = ['Inaccuracy', 'Mistake', 'Blunder'].includes(previous.classification)
-      && previous.expectedLoss >= 0.055;
-    const meaningfulOpportunity = opportunityGain >= 0.085 && afterOpponentMove >= 0.45;
-    const gaveBackEnough = current.expectedLoss >= 0.070
-      && current.expectedLoss >= opportunityGain * 0.55;
+    const opportunity = moverExpectedScore(current.evalBefore, current.color, rating);
+    const afterCurrentMove = moverExpectedScore(current.evalAfter, current.color, rating);
+    const opportunityGain = Math.max(0, opportunity - beforeOpponentMove);
+
+    const newlyWinning = beforeOpponentMove < win - 0.025
+      && opportunity >= win
+      && opportunityGain >= 0.075;
+    const clearlyGiftedChance = opportunityGain >= 0.12 && opportunity >= 0.62;
+    const failedToCashIn = afterCurrentMove < win - 0.035
+      || current.expectedLoss >= Math.max(0.085, opportunityGain * 0.52);
+    const underlyingError = ['Inaccuracy', 'Mistake', 'Blunder'].includes(current.classification);
+    const previousWasNotMiss = previous.classification !== 'Miss';
 
     if (
-      previousWasRealError
-      && meaningfulOpportunity
-      && gaveBackEnough
-      && ['Inaccuracy', 'Mistake'].includes(current.classification)
+      previousWasNotMiss
+      && (newlyWinning || clearlyGiftedChance)
+      && failedToCashIn
+      && underlyingError
       && !current.tags.includes('Missed Mate')
     ) {
       current.classification = 'Miss';

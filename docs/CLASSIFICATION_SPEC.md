@@ -1,4 +1,4 @@
-# Classification specification — V0.2.1
+# Classification specification — V0.2.4
 
 Main labels:
 
@@ -83,3 +83,6 @@ Critical Moment, Major Turning Point and Only Move thresholds are stricter than 
 Mate scores are normalized to White in the engine layer and converted back to the mover's perspective when determining missed-mate context.
 
 This specification remains intentionally tunable for future calibration rounds.
+## V0.2.4 calibration principle
+
+The ordinary categories use the published Chess.com Classification V2 expected-points boundaries: Excellent <= 0.02, Good <= 0.05, Inaccuracy <= 0.10, Mistake <= 0.20, otherwise Blunder. Best/Great/Brilliant/Book/Miss use additional rules. Chess.com's exact rating-to-expected-points fit is not public, so the app uses a documented approximation rather than claiming byte-for-byte parity. PGN NAG annotations are ignored at runtime.

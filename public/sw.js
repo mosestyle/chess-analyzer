@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'chess-analyzer-shell-v4';
+const SHELL_CACHE = 'chess-analyzer-shell-v5';
 const ENGINE_CACHE = 'chess-analyzer-engine-v1';
 const SHELL = ['./', './manifest.webmanifest', './icons/icon.svg'];
 

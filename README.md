@@ -1,6 +1,6 @@
-# Chess Analyzer V0.2.3
+# Chess Analyzer V0.2.4
 
-**Current release:** 0.2.3
+**Current release:** 0.2.4
 
 A responsive, local-first chess analyzer built around Stockfish 18. The analyzer is the primary product; Play vs Computer is a secondary mode that feeds games back into Game Review.
 
@@ -73,7 +73,7 @@ A ready-made workflow is included at:
 
 See [`DEPLOY_GITHUB.md`](DEPLOY_GITHUB.md) for the exact click-by-click steps.
 
-If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.3.md`](UPDATE_NOTES_0.2.3.md).
+If you are updating an existing deployment, see [`UPDATE_NOTES_0.2.4.md`](UPDATE_NOTES_0.2.4.md).
 
 ## Calibration warning
 
@@ -87,6 +87,10 @@ Application source: MIT (see `LICENSE`).
 
 Stockfish/Stockfish.js: GPLv3. See `THIRD_PARTY_NOTICES.md` and `LICENSES/Stockfish-GPL-3.0.txt`.
 
+
+## 0.2.4 Chess.com-style calibration
+
+Version 0.2.4 keeps the fast/cool Standard pipeline from 0.2.3, restores Chess.com's published Classification V2 expected-points bands, replaces the earlier expected-score curve with a Lichess-logistic-centered rating-aware approximation, rebalances Best/Excellent/Good, rewrites Great around outcome-changing moves, and redesigns Miss around a newly-created winning opportunity. Standard still performs at most two tiny special-position refinements (about 120 ms each) and never returns to the old 10-position deep verification stage. See `UPDATE_NOTES_0.2.4.md`.
 
 ## 0.2.3 calibration + cool Standard
 

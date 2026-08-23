@@ -176,3 +176,20 @@ The strongest recurring signals were therefore:
 - Book exactly matched in aggregate
 
 V0.2.3 is explicitly tuned around these aggregate errors rather than one individual game. It also removes the repeated Standard `10/10` verification behavior observed in all five V0.2.2 test runs.
+
+## V0.2.3 follow-up and V0.2.4 direction
+
+V0.2.3 successfully removed the repeated `10/10` Standard verifier, but its stricter Best threshold plus altered ordinary bands over-corrected the distribution in the long tactical calibration game. In particular, too many former Misses were redistributed into Blunder/Mistake/Good, while Chess.com still showed a large Miss population.
+
+V0.2.4 therefore changes strategy instead of continuing to move category thresholds:
+
+- restore the published Classification V2 bands exactly (0.02 / 0.05 / 0.10 / 0.20)
+- keep a middle-ground Best confirmation rule
+- move calibration effort into the evaluation -> expected-score conversion
+- center that conversion on the 0.00368208 chess win-probability sigmoid with a mild rating adjustment
+- define Great through outcome changes / only-good-move logic
+- define Miss through a newly-created winning opportunity rather than through the preceding label alone
+- retain V0.2.3's bounded thermal-friendly Standard verifier
+- never use embedded Chess.com `$NAG` annotations as runtime answers
+
+The five reference PGNs and Chess.com summary totals are stored in `tests/fixtures/calibration-games.json` so future classifier changes have a stable regression dataset.

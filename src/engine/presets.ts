@@ -37,8 +37,8 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     reviewDepth: 12,
     reviewMultiPV: 2,
     // Standard should feel close to the fast/cool V0.2.0 path. A maximum of two
-    // short time-bounded checks replaces the former ten depth-15 searches.
-    reviewVerifyMovetimeMs: 180,
+    // very short time-bounded checks replaces the former ten depth-15 searches.
+    reviewVerifyMovetimeMs: 120,
     reviewVerifyLimit: 2,
     reviewVerifyPauseMs: 60,
     reviewVerifyErrors: false,

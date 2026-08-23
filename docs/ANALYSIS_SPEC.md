@@ -1,4 +1,7 @@
-# Analysis specification — V0.2.3
+# Analysis specification — V0.2.4
+
+> V0.2.4 calibration note: Standard classifications use the published 0.02 / 0.05 / 0.10 / 0.20 expected-points bands. The expected-points conversion is a rating-aware approximation centered on the 0.00368208 chess win-probability sigmoid. Standard keeps at most two ~120 ms special refinements; embedded PGN NAG annotations are never used to produce classifications.
+
 
 For a PGN, reconstruct every position from the starting FEN. Stockfish scores are normalized to White in the engine layer, while classification and expected-score loss are evaluated from the mover's perspective.
 
