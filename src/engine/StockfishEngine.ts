@@ -3,6 +3,7 @@ import type { EngineAnalysis, EngineLine, EngineMode } from '../types';
 interface SearchOptions {
   depth?: number;
   movetime?: number;
+  nodes?: number;
   multiPV?: number;
   skillLevel?: number;
   limitStrength?: boolean;
@@ -186,6 +187,7 @@ export class StockfishEngine {
 
       this.pending = { resolve, reject, fen, lines: new Map(), bestDepth: 0, timeout };
       if (options.movetime) this.send(`go movetime ${Math.max(25, Math.round(options.movetime))}`);
+      else if (options.nodes) this.send(`go nodes ${Math.max(1000, Math.round(options.nodes))}`);
       else this.send(`go depth ${Math.max(1, Math.round(options.depth ?? 16))}`);
     });
   }

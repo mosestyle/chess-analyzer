@@ -53,6 +53,18 @@ export interface ReviewMove {
   evalBefore: number;
   evalAfter: number;
   expectedLoss: number;
+  /** Stable Analyzer V2 raw features (independent of the displayed label). */
+  winPctLoss?: number;
+  winPctBefore?: number;
+  winPctAfter?: number;
+  cpLoss?: number;
+  isEngineTop?: boolean;
+  legalCount?: number;
+  isSacrifice?: boolean;
+  ratingUsed?: number;
+  standardClassification?: Exclude<Classification, 'Brilliant' | 'Great' | 'Best' | 'Book' | 'Miss'>;
+  beforeMate?: number;
+  afterMate?: number;
   bestMove: string;
   bestLine: string[];
   alternatives: EngineLine[];

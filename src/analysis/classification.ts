@@ -1,79 +1,75 @@
-import type { Classification, EngineLine, SpecialTag } from '../types';
-import { movedPieceIsEnPrise } from '../chess/helpers';
+import { Chess } from 'chess.js';
+import type { Classification, ReviewMove, SpecialTag } from '../types';
+import {
+  DEFAULT_RATING,
+  EXPECTED_POINT_BANDS,
+  RELATIONAL,
+  expectedLoss,
+  moverCp,
+  moverWinPercent,
+  winPercentDrop,
+} from './calibration';
 
-const DEFAULT_RATING = 1200;
-const BASE_WIN_CURVE = 0.00368208;
+export { expectedLoss, moverWinPercent } from './calibration';
 
-/**
- * V0.2.4: Chess.com-style expected-points approximation.
- *
- * Chess.com publicly documents the move-classification bands as expected-points
- * loss (0.02 / 0.05 / 0.10 / 0.20) and states that the evaluation-to-expected-
- * points conversion varies with player rating. The exact fitted rating model is
- * not public, so we use the widely used 0.00368208 logistic curve as the center
- * and make it deliberately flatter for lower-rated players and a little steeper
- * for stronger players.
- *
- * This keeps the public thresholds intact instead of trying to "fix" results by
- * moving the category boundaries around from release to release.
- */
-export function winCurveForRating(rating = DEFAULT_RATING) {
-  const safe = Math.max(100, Math.min(3000, Number.isFinite(rating) ? rating : DEFAULT_RATING));
-  const factor = Math.max(0.82, Math.min(1.08, 0.80 + safe / 10_000));
-  return BASE_WIN_CURVE * factor;
-}
-
-export function whiteExpectedScore(cp: number, rating = DEFAULT_RATING) {
-  const bounded = Math.max(-2400, Math.min(2400, cp));
-  return 1 / (1 + Math.exp(-winCurveForRating(rating) * bounded));
-}
-
-export function moverExpectedScore(cp: number, color: 'w' | 'b', rating = DEFAULT_RATING) {
-  const white = whiteExpectedScore(cp, rating);
-  return color === 'w' ? white : 1 - white;
-}
-
-export function expectedLoss(beforeCp: number, afterCp: number, color: 'w' | 'b', rating = DEFAULT_RATING) {
-  return Math.max(0, moverExpectedScore(beforeCp, color, rating) - moverExpectedScore(afterCp, color, rating));
-}
-
-/** Public Chess.com Classification V2 expected-points bands. */
-export const CLASSIFICATION_BANDS = {
-  excellent: 0.02,
-  good: 0.05,
-  inaccuracy: 0.10,
-  mistake: 0.20,
-} as const;
-
-export function winningExpectedThreshold(rating = DEFAULT_RATING) {
-  const safe = Math.max(100, Math.min(3000, Number.isFinite(rating) ? rating : DEFAULT_RATING));
-  // Lower-rated games require a little less expected score before an opportunity
-  // is treated as practically winning; stronger games require a little more.
-  return Math.max(0.67, Math.min(0.74, 0.675 + safe / 45_000));
-}
-
-function lineGap(lines: EngineLine[], color: 'w' | 'b', rating = DEFAULT_RATING) {
-  if (lines.length < 2) return 0;
-  const first = moverExpectedScore(lines[0].scoreCp, color, rating);
-  const second = moverExpectedScore(lines[1].scoreCp, color, rating);
-  return Math.max(0, first - second);
-}
-
-function uniqueMoveThreshold(rating = DEFAULT_RATING) {
-  const safe = Math.max(100, Math.min(3000, rating));
-  return Math.max(0.135, Math.min(0.19, 0.13 + safe / 30_000));
-}
-
-function mateForColor(mate: number | undefined, color: 'w' | 'b') {
-  if (!mate) return 0;
+function mateForMover(mate: number | undefined, color: 'w' | 'b') {
+  if (mate == null) return null;
   return color === 'w' ? mate : -mate;
 }
 
-export function classifyMove(args: {
+export function standardClassification(dropPct: number): Exclude<Classification, 'Brilliant' | 'Great' | 'Best' | 'Book' | 'Miss'> {
+  if (dropPct < EXPECTED_POINT_BANDS.excellent) return 'Excellent';
+  if (dropPct < EXPECTED_POINT_BANDS.good) return 'Good';
+  if (dropPct < EXPECTED_POINT_BANDS.inaccuracy) return 'Inaccuracy';
+  if (dropPct < EXPECTED_POINT_BANDS.mistake) return 'Mistake';
+  return 'Blunder';
+}
+
+function pieceValue(type: string | undefined) {
+  return ({ p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 } as Record<string, number>)[type || ''] ?? 0;
+}
+
+/**
+ * Conservative board-based sacrifice detector. It deliberately requires a
+ * non-pawn piece to be voluntarily exposed to a lower-value capture after the
+ * move. This makes Brilliant rare and avoids calling normal equal trades sacs.
+ */
+export function isSoundSacrificeCandidate(args: {
+  fenBefore: string;
+  fenAfter: string;
+  uci: string;
+  color: 'w' | 'b';
+  piece: string;
+  captured?: string;
+}) {
+  if (args.piece === 'p' || args.piece === 'k') return false;
+  const movedValue = pieceValue(args.piece);
+  const capturedValue = pieceValue(args.captured);
+  if (movedValue < 3 || capturedValue >= movedValue - 0.5) return false;
+
+  try {
+    const after = new Chess(args.fenAfter);
+    const to = args.uci.slice(2, 4) as Parameters<Chess['attackers']>[0];
+    const attackers = after.attackers(to, args.color === 'w' ? 'b' : 'w');
+    if (!attackers.length) return false;
+    const cheapestAttacker = Math.min(...attackers.map((sq) => pieceValue(after.get(sq)?.type)));
+    if (cheapestAttacker >= movedValue) return false;
+
+    // A sacrifice must have been a choice, not simply a trapped piece being moved.
+    const before = new Chess(args.fenBefore);
+    const from = args.uci.slice(0, 2);
+    const alternatives = before.moves({ verbose: true }).filter((m) => m.from !== from);
+    return alternatives.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export interface ClassifyArgs {
   loss: number;
   actualUci: string;
   bestUci: string;
-  lines: EngineLine[];
+  lines?: unknown[];
   color: 'w' | 'b';
   isBook: boolean;
   fenBefore: string;
@@ -83,114 +79,180 @@ export function classifyMove(args: {
   legalCount: number;
   beforeCp: number;
   afterCp: number;
+  beforeMate?: number;
+  afterMate?: number;
   rating?: number;
-}): Classification {
-  const {
-    loss, actualUci, bestUci, lines, color, isBook, fenAfter,
-    piece, captured, legalCount, beforeCp, afterCp, rating = DEFAULT_RATING,
-  } = args;
+}
 
-  if (isBook) return 'Book';
+/**
+ * Context-free classifier used by Practice Mode and as the first stage of a
+ * full Game Review. Full PGN review then applies relational Brilliant/Great/
+ * Miss rules in applyRelationalClassifications().
+ */
+export function classifyMove(args: ClassifyArgs): Classification {
+  const rating = args.rating ?? DEFAULT_RATING;
+  if (args.isBook) return 'Book';
+  if (args.legalCount <= 1) return 'Best';
 
-  const exactEngineChoice = actualUci === bestUci;
-  const cpDrift = Math.abs(beforeCp - afterCp);
-  const gap = lineGap(lines, color, rating);
-  const beforeExpected = moverExpectedScore(beforeCp, color, rating);
-  const afterExpected = moverExpectedScore(afterCp, color, rating);
+  const isTop = args.actualUci.slice(0, 4) === args.bestUci.slice(0, 4);
+  if (isTop) return 'Best';
 
-  // A depth-12 first PV can occasionally disagree with the independently
-  // searched resulting position. V0.2.2 called every shallow first-PV match
-  // Best; V0.2.3 was too strict. This middle ground keeps an exact engine choice
-  // as Best unless the follow-up search disagrees by more than a small amount.
-  const confirmedBest = exactEngineChoice && (legalCount <= 1 || loss <= 0.012);
-  const equivalentBest = !exactEngineChoice
-    && lines.length >= 2
-    && loss <= 0.0025
-    && cpDrift <= 12
-    && gap <= 0.012;
-  const topMove = confirmedBest || equivalentBest;
-
-  if (topMove) {
-    if (legalCount <= 1) return 'Best';
-
-    const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-    const movedValue = values[piece] || 0;
-    const capturedValue = captured ? values[captured] || 0 : 0;
-    const destination = actualUci.slice(2, 4);
-    const sacrificeLike = movedValue >= 3
-      && movedPieceIsEnPrise(fenAfter, destination)
-      && capturedValue + (rating < 800 ? 0.5 : 1) < movedValue;
-
-    // Brilliant: best/nearly-best, a genuine piece sacrifice, not losing after
-    // the move, and not already trivially won beforehand. Lower-rated players
-    // get a slightly wider practical allowance, matching Chess.com's published
-    // description without attempting to clone unpublished internals.
-    const brilliantLossAllowance = rating < 800 ? 0.012 : 0.008;
-    if (
-      sacrificeLike
-      && loss <= brilliantLossAllowance
-      && afterExpected >= 0.46
-      && beforeExpected <= 0.90
-    ) return 'Brilliant';
-
-    // Great: a move that changes the practical result, or the only clearly good
-    // move. Unlike V0.2.x gap-only logic, this explicitly models losing->equal
-    // and equal->winning transitions described by Chess.com.
-    const win = winningExpectedThreshold(rating);
-    const rescuesLoss = beforeExpected <= 0.36 && afterExpected >= 0.47;
-    const createsWin = beforeExpected < win && afterExpected >= win;
-    const onlyGoodMove = exactEngineChoice
-      && lines.length >= 2
-      && gap >= uniqueMoveThreshold(rating)
-      && beforeExpected >= 0.12
-      && beforeExpected <= 0.88;
-    if (rescuesLoss || createsWin || onlyGoodMove) return 'Great';
-
-    return 'Best';
+  const beforeMate = mateForMover(args.beforeMate, args.color);
+  const afterMate = mateForMover(args.afterMate, args.color);
+  if (beforeMate != null && beforeMate > 0 && (afterMate == null || afterMate <= 0)) return 'Miss';
+  if ((beforeMate == null || beforeMate >= 0) && afterMate != null && afterMate < 0) {
+    const before = moverCp(args.beforeCp, args.color);
+    return before > -RELATIONAL.clearAdvantageCp ? 'Mistake' : 'Blunder';
   }
 
-  // Keep the public Classification V2 boundaries exactly. The calibration work
-  // now happens in the expected-points conversion and the special categories,
-  // not by inventing different category cutoffs.
-  if (loss <= CLASSIFICATION_BANDS.excellent) return 'Excellent';
-  if (loss <= CLASSIFICATION_BANDS.good) return 'Good';
-  if (loss <= CLASSIFICATION_BANDS.inaccuracy) return 'Inaccuracy';
-  if (loss <= CLASSIFICATION_BANDS.mistake) return 'Mistake';
-  return 'Blunder';
+  return standardClassification(winPercentDrop(args.beforeCp, args.afterCp, args.color, rating));
+}
+
+function crossesClearAdvantage(move: ReviewMove) {
+  const before = moverCp(move.evalBefore, move.color);
+  const after = moverCp(move.evalAfter, move.color);
+  const ca = RELATIONAL.clearAdvantageCp;
+  return (before >= ca && after < ca) || (before >= -ca && after < -ca);
+}
+
+function previousMistakeSignal(move: ReviewMove | undefined) {
+  if (!move) return false;
+  if (move.standardClassification === 'Blunder' || move.standardClassification === 'Mistake') return true;
+  return move.standardClassification === 'Inaccuracy'
+    && (move.cpLoss ?? 0) >= RELATIONAL.mistakeMinCpLoss
+    && crossesClearAdvantage(move);
+}
+
+function opportunityGain(previous: ReviewMove, current: ReviewMove) {
+  const rating = current.ratingUsed ?? DEFAULT_RATING;
+  const beforeOpp = moverWinPercent(previous.evalBefore, current.color, rating);
+  const afterOpp = moverWinPercent(current.evalBefore, current.color, rating);
+  return Math.max(0, afterOpp - beforeOpp);
+}
+
+/**
+ * Analyzer V2 relational pass. The rules intentionally operate on stable raw
+ * features from a single Stockfish pass, instead of triggering extra searches.
+ */
+export function applyRelationalClassifications(moves: ReviewMove[]) {
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i];
+    const previous = i > 0 ? moves[i - 1] : undefined;
+    const previousPrevious = i > 1 ? moves[i - 2] : undefined;
+    const rating = move.ratingUsed ?? DEFAULT_RATING;
+    const beforeWin = moverWinPercent(move.evalBefore, move.color, rating);
+    const afterWin = moverWinPercent(move.evalAfter, move.color, rating);
+    const beforeMate = mateForMover(move.beforeMate, move.color);
+    const afterMate = mateForMover(move.afterMate, move.color);
+
+    if (move.classification === 'Book') continue;
+    if ((move.legalCount ?? 2) <= 1) { move.classification = 'Best'; continue; }
+
+    const prevMistake = previousMistakeSignal(previous);
+    const prevPrevMistake = previousMistakeSignal(previousPrevious);
+    const gain = previous ? opportunityGain(previous, move) : 0;
+    const previousWasMiss = previous?.classification === 'Miss';
+
+    // Brilliant: exact top move + sound voluntary sacrifice + very small loss,
+    // normally in response to a recent error. Keep this intentionally rare.
+    if (
+      move.isEngineTop
+      && move.isSacrifice
+      && (move.winPctLoss ?? 99) < 2
+      && beforeWin < RELATIONAL.brilliantMaxWinBefore
+      && afterWin >= RELATIONAL.brilliantMinWinAfter
+      && (prevMistake || (!previousMistakeSignal(previous) && prevPrevMistake) || (afterMate != null && afterMate > 0))
+    ) {
+      move.classification = 'Brilliant';
+      continue;
+    }
+
+    // Great: an exact engine-top response that meaningfully cashes in on an
+    // opponent error or rescues/changes the practical result. Requiring both a
+    // real opportunity gain and the top engine move keeps Great uncommon.
+    if (
+      move.isEngineTop
+      && !previousWasMiss
+      && prevMistake
+      && gain >= RELATIONAL.greatMinOpportunityGain
+      && (move.winPctLoss ?? 99) < 2
+      && afterWin >= beforeWin - 1
+    ) {
+      move.classification = 'Great';
+      continue;
+    }
+
+    // The engine's actual #1 move is always Best unless upgraded above.
+    if (move.isEngineTop) {
+      move.classification = 'Best';
+      continue;
+    }
+
+    // Missing a forced mate is always a Miss.
+    if (beforeMate != null && beforeMate > 0 && (afterMate == null || afterMate <= 0)) {
+      move.classification = 'Miss';
+      continue;
+    }
+
+    // Miss: opponent just made a punishable error and this move gives back a
+    // comparable amount of the opportunity. This relational cp-loss test is
+    // much more stable than the V0.2.x outcome-threshold overrides.
+    const missEligible = move.standardClassification === 'Inaccuracy'
+      || move.standardClassification === 'Mistake'
+      || move.standardClassification === 'Blunder';
+    if (
+      !previousWasMiss
+      && previous
+      && prevMistake
+      && gain >= RELATIONAL.missMinOpportunityGain
+      && missEligible
+      && (move.winPctLoss ?? 0) >= 4
+      && (move.cpLoss ?? 0) <= (previous.cpLoss ?? 0) + RELATIONAL.missToleranceCp
+    ) {
+      move.classification = 'Miss';
+      continue;
+    }
+
+    // Contextual Mistake: a nominal Inaccuracy that throws away/cedes a clear
+    // ~2-pawn advantage is more consequential than the raw drop bucket suggests.
+    if (
+      move.standardClassification === 'Inaccuracy'
+      && (move.cpLoss ?? 0) >= RELATIONAL.mistakeMinCpLoss
+      && crossesClearAdvantage(move)
+    ) {
+      move.classification = 'Mistake';
+      continue;
+    }
+
+    // Mate transitions need explicit handling because cp saturation can hide
+    // their severity in an ordinary logistic bucket.
+    if ((beforeMate == null || beforeMate >= 0) && afterMate != null && afterMate < 0) {
+      move.classification = moverCp(move.evalBefore, move.color) > -RELATIONAL.clearAdvantageCp ? 'Mistake' : 'Blunder';
+      continue;
+    }
+
+    move.classification = move.standardClassification ?? move.classification;
+  }
 }
 
 export function specialTags(args: {
-  loss: number;
-  beforeCp: number;
-  afterCp: number;
-  beforeMate?: number;
-  afterMate?: number;
-  color: 'w' | 'b';
-  lines: EngineLine[];
-  bestUci: string;
-  actualUci: string;
-  classification: Classification;
-  rating?: number;
+  move: ReviewMove;
 }) {
+  const move = args.move;
   const tags: SpecialTag[] = [];
-  const rating = args.rating ?? DEFAULT_RATING;
-  const before = moverExpectedScore(args.beforeCp, args.color, rating);
-  const after = moverExpectedScore(args.afterCp, args.color, rating);
-  const gap = lineGap(args.lines, args.color, rating);
-  const win = winningExpectedThreshold(rating);
+  const rating = move.ratingUsed ?? DEFAULT_RATING;
+  const before = moverWinPercent(move.evalBefore, move.color, rating);
+  const after = moverWinPercent(move.evalAfter, move.color, rating);
 
-  const crossedResultBoundary = (before >= win && after < 0.55)
-    || (before >= 0.48 && before <= 0.60 && after <= 0.34);
-  if (args.loss >= 0.11 || crossedResultBoundary || gap >= 0.20) tags.push('Critical Moment');
-  if (args.loss >= 0.20 || (before >= win && after <= 0.36)) tags.push('Major Turning Point');
-  if (gap >= uniqueMoveThreshold(rating) && args.actualUci === args.bestUci && before >= 0.12 && before <= 0.88) tags.push('Only Move');
-  if (args.classification === 'Brilliant') tags.push('Winning Sacrifice');
+  if (['Mistake', 'Miss', 'Blunder', 'Great', 'Brilliant'].includes(move.classification)) tags.push('Critical Moment');
+  if (move.classification === 'Blunder' || (before >= 70 && after < 45)) tags.push('Major Turning Point');
+  if ((move.legalCount ?? 2) <= 1) tags.push('Forced Move');
+  if (move.classification === 'Brilliant') tags.push('Winning Sacrifice');
+  if (before >= 70 && after < 55 && (move.winPctLoss ?? 0) >= 10) tags.push('Missed Win');
 
-  if (before >= win && after < 0.55 && args.loss >= 0.10) tags.push('Missed Win');
-
-  const mateBefore = mateForColor(args.beforeMate ?? args.lines[0]?.mate, args.color);
-  const mateAfter = mateForColor(args.afterMate, args.color);
-  if (mateBefore > 0 && mateAfter <= 0 && args.actualUci !== args.bestUci) tags.push('Missed Mate');
-
+  const bm = mateForMover(move.beforeMate, move.color);
+  const am = mateForMover(move.afterMate, move.color);
+  if (bm != null && bm > 0 && (am == null || am <= 0)) tags.push('Missed Mate');
+  if (move.classification === 'Miss' && !tags.includes('Missed Mate')) tags.push('Missed Tactic');
   return tags;
 }

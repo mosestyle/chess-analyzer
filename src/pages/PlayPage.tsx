@@ -6,11 +6,11 @@ import { ClassificationBadge } from '../components/ClassificationBadge';
 import { EngineSelector } from '../components/EngineSelector';
 import { engineManager } from '../engine/EngineManager';
 import { difficultyPreset } from '../play/difficulty';
-import { classifyMove, expectedLoss, specialTags } from '../analysis/classification';
+import { classifyMove, expectedLoss } from '../analysis/classification';
 import { explainMove } from '../analysis/explanations';
 import { moveToUci, START_FEN, uciToSan } from '../chess/helpers';
 import { playChessSound } from '../services/sound';
-import type { Classification, GameReview, Settings, SideChoice } from '../types';
+import type { Classification, GameReview, Settings, SideChoice, SpecialTag } from '../types';
 import { analyzePgn } from '../analysis/analyzeGame';
 
 function rebuild(sans: string[]) {
@@ -132,19 +132,14 @@ export function PlayPage({ settings, setSettings, onBack, onReview }: {
         legalCount,
         beforeCp: before.scoreCp,
         afterCp: after.scoreCp,
-      });
-      const tags = specialTags({
-        loss,
-        beforeCp: before.scoreCp,
-        afterCp: after.scoreCp,
         beforeMate: before.mate,
         afterMate,
-        color,
-        lines: before.lines,
-        bestUci: before.bestMove,
-        actualUci: moveToUci(moved),
-        classification,
       });
+      const tags: SpecialTag[] = [];
+      if (legalCount === 1) tags.push('Forced Move');
+      const beforeMate = before.mate == null ? null : (color === 'w' ? before.mate : -before.mate);
+      const afterMoverMate = afterMate == null ? null : (color === 'w' ? afterMate : -afterMate);
+      if (beforeMate != null && beforeMate > 0 && (afterMoverMate == null || afterMoverMate <= 0)) tags.push('Missed Mate');
       setFeedback({
         classification,
         text: explainMove({

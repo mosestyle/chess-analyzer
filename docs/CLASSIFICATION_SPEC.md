@@ -1,88 +1,61 @@
-# Classification specification — V0.2.4
+# Classification specification — V0.3 Analyzer Engine V2
 
-Main labels:
+## Principle
 
-- Brilliant
-- Great
-- Best
-- Excellent
-- Good
-- Book
-- Inaccuracy
-- Mistake
-- Miss
-- Blunder
+Never tune summary counts directly. Every move is classified from stable raw evidence produced by one engine pass.
 
-Special tags remain separate from the main label:
+## Raw evidence
 
-- Critical Moment
-- Only Move
-- Forced Move
-- Missed Win
-- Missed Mate
-- Missed Tactic
-- Winning Sacrifice
-- Hanging Piece
-- Major Turning Point
+Each ReviewMove keeps:
 
-## Rating-aware expected-score model
+- evalBefore / evalAfter
+- mover centipawn loss
+- mover win probability before / after
+- win-probability loss
+- engine #1 move match
+- legal move count
+- mate state
+- sacrifice candidate
+- player rating used by the Expected Points model
+- ordinary baseline class
 
-Stockfish centipawn evaluations are converted into mover expected score before loss is measured. V0.2.1 reads `WhiteElo` / `BlackElo` from PGN headers and adjusts the curve modestly by player rating. Missing ratings use 1200.
+## Ordinary categories
 
-This is an independent local model. It is not a copy of another site's private probability curve.
+V0.3 follows Chess.com's public Classification V2 Expected Points bands in percentage points of expected outcome lost:
 
-## Expected-score loss bands
+- Excellent: <2
+- Good: 2–5
+- Inaccuracy: 5–10
+- Mistake: 10–20
+- Blunder: 20+
 
-For a legal non-best, non-book move:
+Book is determined before these categories. Best is the actual engine #1 move (or the only legal move).
 
-- Excellent: loss <= 0.02
-- Good: loss <= 0.05
-- Inaccuracy: loss <= 0.10
-- Mistake: loss <= 0.20
-- Blunder: loss > 0.20
+## Relational categories
 
-Book is an opening-theory label and takes precedence when the local opening path recognizes the move.
+### Brilliant
 
-## Best / equivalent Best
+A deliberately rare upgrade requiring:
 
-An exact Stockfish top UCI move is Best unless it satisfies stricter Great/Brilliant conditions.
+- engine #1 move;
+- <2 percentage-point loss;
+- conservative board-based voluntary piece sacrifice;
+- sound resulting position;
+- not already trivially winning;
+- recent opponent error or a mating continuation.
 
-Because principal variations can reorder at practical search depths, a non-top move may also be treated as Best when its expected loss and centipawn drift are numerically indistinguishable from zero. This reduces false `Excellent` labels caused only by unstable PV ordering.
+### Great
 
-## Great
+Requires the exact engine #1 move, a recent punishable opponent error, a meaningful new opportunity, and preservation of that opportunity.
 
-Great requires:
+### Miss
 
-- the played move is the actual top engine move
-- more than one legal move exists
-- a large expected-score gap to the second line
-- the position is not already almost completely won or lost
+Requires a real previous opponent mistake/blunder (or an Inaccuracy that crosses a clear-advantage boundary), a measurable opportunity gain, and a current error that gives back a comparable amount. Losing a forced mate is a Miss.
 
-This keeps Great focused on genuinely important unique moves rather than routine conversion moves.
+### Contextual Mistake
 
-## Brilliant
+An ordinary Inaccuracy can be promoted to Mistake when it loses at least ~1.2 pawns and crosses a clear ~2-pawn advantage/disadvantage boundary.
 
-Brilliant is deliberately rare and requires:
+## NAGs
 
-- actual top engine move
-- apparent meaningful material risk/sacrifice
-- strong uniqueness signal versus the second line
-- essentially no expected-score loss
-- a position where the sacrifice preserves a viable result
-
-## Miss
-
-Miss is applied contextually after ordinary move classification. V0.2.1 measures how much opportunity the opponent's previous move created, then checks whether the player gave a meaningful share of that opportunity back.
-
-Missed Mate remains a special tag and is handled separately so a forced mating opportunity is explained explicitly.
-
-## Special tags
-
-Critical Moment, Major Turning Point and Only Move thresholds are stricter than V0.2 to reduce tag spam in tactical games.
-
-Mate scores are normalized to White in the engine layer and converted back to the mover's perspective when determining missed-mate context.
-
-This specification remains intentionally tunable for future calibration rounds.
-## V0.2.4 calibration principle
-
-The ordinary categories use the published Chess.com Classification V2 expected-points boundaries: Excellent <= 0.02, Good <= 0.05, Inaccuracy <= 0.10, Mistake <= 0.20, otherwise Blunder. Best/Great/Brilliant/Book/Miss use additional rules. Chess.com's exact rating-to-expected-points fit is not public, so the app uses a documented approximation rather than claiming byte-for-byte parity. PGN NAG annotations are ignored at runtime.
+Imported Chess.com $1/$2/$4/$6/$9 annotations are never used at runtime to produce labels. They exist only as external regression references.

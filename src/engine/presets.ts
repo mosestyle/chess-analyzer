@@ -2,20 +2,19 @@ import type { AnalysisQuality } from '../types';
 
 export interface AnalysisPreset {
   label: string;
-  /** Deeper settings for a single pasted FEN. */
+  /** Deeper settings for one pasted FEN / interactive analysis. */
   positionDepth: number;
   positionMultiPV: number;
-  /** Fast first pass for a full-game review. */
-  reviewDepth: number;
-  reviewMultiPV: number;
-  /** Optional short second-pass search budget for genuinely special positions. */
-  reviewVerifyMovetimeMs: number;
-  /** Hard cap on extra verification positions. */
-  reviewVerifyLimit: number;
-  /** Small idle gap between bounded verification searches. */
-  reviewVerifyPauseMs: number;
-  /** Deep/Maximum may spend extra work around ordinary error boundaries. */
-  reviewVerifyErrors: boolean;
+  /**
+   * Analyzer Engine V2 full-game budget. Fixed nodes make the measurement layer
+   * reproducible across devices: faster CPUs finish sooner but do not get a
+   * different classification simply because they reached a higher depth.
+   */
+  reviewNodes: number;
+  /** One principal variation is the frozen V2 classification input. */
+  reviewMultiPV: 1;
+  /** Tiny cooperative pause between positions to avoid sustained thermal spikes. */
+  reviewPauseMs: number;
 }
 
 export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
@@ -23,46 +22,34 @@ export const ANALYSIS_PRESETS: Record<AnalysisQuality, AnalysisPreset> = {
     label: 'Quick',
     positionDepth: 10,
     positionMultiPV: 2,
-    reviewDepth: 9,
-    reviewMultiPV: 2,
-    reviewVerifyMovetimeMs: 0,
-    reviewVerifyLimit: 0,
-    reviewVerifyPauseMs: 0,
-    reviewVerifyErrors: false,
+    reviewNodes: 18_000,
+    reviewMultiPV: 1,
+    reviewPauseMs: 12,
   },
   standard: {
     label: 'Standard',
     positionDepth: 14,
     positionMultiPV: 3,
-    reviewDepth: 12,
-    reviewMultiPV: 2,
-    // Standard should feel close to the fast/cool V0.2.0 path. A maximum of two
-    // very short time-bounded checks replaces the former ten depth-15 searches.
-    reviewVerifyMovetimeMs: 120,
-    reviewVerifyLimit: 2,
-    reviewVerifyPauseMs: 60,
-    reviewVerifyErrors: false,
+    // Chosen to stay close to V0.2.0 thermals while being steadier than a raw
+    // depth-12 cutoff. No second verification pass exists in V0.3 Standard.
+    reviewNodes: 48_000,
+    reviewMultiPV: 1,
+    reviewPauseMs: 24,
   },
   deep: {
     label: 'Deep',
     positionDepth: 18,
     positionMultiPV: 3,
-    reviewDepth: 15,
-    reviewMultiPV: 2,
-    reviewVerifyMovetimeMs: 450,
-    reviewVerifyLimit: 6,
-    reviewVerifyPauseMs: 80,
-    reviewVerifyErrors: true,
+    reviewNodes: 140_000,
+    reviewMultiPV: 1,
+    reviewPauseMs: 18,
   },
   maximum: {
     label: 'Maximum',
     positionDepth: 22,
     positionMultiPV: 3,
-    reviewDepth: 19,
-    reviewMultiPV: 3,
-    reviewVerifyMovetimeMs: 900,
-    reviewVerifyLimit: 10,
-    reviewVerifyPauseMs: 50,
-    reviewVerifyErrors: true,
+    reviewNodes: 360_000,
+    reviewMultiPV: 1,
+    reviewPauseMs: 12,
   },
 };

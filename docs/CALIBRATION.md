@@ -193,3 +193,11 @@ V0.2.4 therefore changes strategy instead of continuing to move category thresho
 - never use embedded Chess.com `$NAG` annotations as runtime answers
 
 The five reference PGNs and Chess.com summary totals are stored in `tests/fixtures/calibration-games.json` so future classifier changes have a stable regression dataset.
+
+## V0.3 architecture reset
+
+After V0.2.4 continued to move individual labels around between releases, V0.3 stops hand-tuning summary totals. The five comparison games are now treated as a validation corpus for Analyzer Engine V2.
+
+The engine measurement contract is frozen first (fixed nodes, MultiPV 1, one pass). Only after that should calibration constants or relational rules be adjusted. Accuracy is based on raw win-probability loss and is independent of final category labels.
+
+T-Julsgaard/Chess-Review is used as an architectural benchmark only; its GPL source and calibration file are not copied into this repository.

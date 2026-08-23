@@ -4,7 +4,14 @@ import { ANALYSIS_PRESETS } from '../engine/presets';
 import type { AnalysisQuality, Classification, EngineAnalysis, EngineMode, GameReview, ReviewMove } from '../types';
 import { START_FEN, moveToUci, movedPieceIsEnPrise } from '../chess/helpers';
 import { detectOpening, isLikelyBookMove } from '../chess/openings';
-import { CLASSIFICATION_BANDS, classifyMove, expectedLoss, moverExpectedScore, specialTags, winningExpectedThreshold } from './classification';
+import {
+  applyRelationalClassifications,
+  classifyMove,
+  isSoundSacrificeCandidate,
+  specialTags,
+  standardClassification,
+} from './classification';
+import { expectedLoss, moverCp, moverWinPercent, winPercentDrop } from './calibration';
 import { sideAccuracy } from './accuracy';
 import { explainMove } from './explanations';
 
@@ -39,84 +46,47 @@ function ratingFor(color: 'w' | 'b', whiteElo?: number, blackElo?: number) {
   return color === 'w' ? (whiteElo ?? 1200) : (blackElo ?? 1200);
 }
 
-async function analyzePosition(
+function sleep(ms: number) {
+  return ms > 0 ? new Promise<void>((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
+async function analyzeReviewPosition(
   fen: string,
   mode: EngineMode,
   quality: AnalysisQuality,
-  multiPV = 1,
-  options: { depth?: number; movetime?: number } = {},
 ) {
   const terminal = terminalAnalysis(fen);
   if (terminal) return terminal;
   const preset = ANALYSIS_PRESETS[quality];
   const engine = await engineManager.get(mode);
   return engine.analyze(fen, {
-    depth: options.movetime ? undefined : (options.depth ?? preset.reviewDepth),
-    movetime: options.movetime,
-    multiPV,
+    nodes: preset.reviewNodes,
+    multiPV: preset.reviewMultiPV,
     hash: 16,
   });
 }
 
-interface VerifyTarget {
-  multiPV: number;
-  priority: number;
-}
-
-function addVerifyPosition(
-  map: Map<number, VerifyTarget>,
-  index: number,
-  total: number,
-  multiPV: number,
-  priority: number,
-) {
-  if (index < 0 || index >= total) return;
-  const current = map.get(index);
-  map.set(index, {
-    multiPV: Math.max(current?.multiPV || 1, multiPV),
-    priority: Math.max(current?.priority || 0, priority),
-  });
-}
-
-function nearClassificationBoundary(loss: number) {
-  const boundaries = [
-    CLASSIFICATION_BANDS.excellent,
-    CLASSIFICATION_BANDS.good,
-    CLASSIFICATION_BANDS.inaccuracy,
-    CLASSIFICATION_BANDS.mistake,
-  ];
-  return boundaries.some((boundary) => Math.abs(loss - boundary) <= 0.010);
-}
-
-function coolDown(ms: number) {
-  return ms > 0 ? new Promise<void>((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
-}
-
 function criticalPriority(move: ReviewMove) {
   const classWeight: Partial<Record<Classification, number>> = {
-    Brilliant: 85,
-    Great: 72,
-    Inaccuracy: 38,
-    Mistake: 62,
-    Miss: 68,
-    Blunder: 88,
+    Brilliant: 92,
+    Great: 78,
+    Inaccuracy: 34,
+    Mistake: 58,
+    Miss: 70,
+    Blunder: 90,
   };
-  let score = (classWeight[move.classification] || 0) + move.expectedLoss * 220;
-  if (move.tags.includes('Major Turning Point')) score += 45;
+  let score = (classWeight[move.classification] || 0) + (move.winPctLoss ?? move.expectedLoss * 100) * 2.1;
+  if (move.tags.includes('Major Turning Point')) score += 38;
   if (move.tags.includes('Missed Mate')) score += 55;
-  if (move.tags.includes('Missed Win')) score += 25;
-  if (move.tags.includes('Only Move')) score += 28;
+  if (move.tags.includes('Missed Win')) score += 22;
   return score;
 }
 
 function trimCriticalMoments(moves: ReviewMove[]) {
-  // V0.2.2 could label a third of a chaotic game as Critical. Keep Critical as a
-  // useful review-navigation concept by retaining only the most consequential
-  // moments. The cap scales gently with game length.
-  const limit = Math.max(3, Math.min(8, Math.ceil(moves.length / 16)));
+  const limit = Math.max(3, Math.min(8, Math.ceil(moves.length / 18)));
   const candidates = moves
     .map((move, index) => ({ move, index, score: criticalPriority(move) }))
-    .filter(({ move, score }) => move.tags.includes('Critical Moment') || score >= 60)
+    .filter(({ move, score }) => move.tags.includes('Critical Moment') || score >= 62)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, limit);
 
@@ -154,7 +124,7 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
   const sans = moves.map((move) => move.source.san);
   const positionFens = [startFen, ...moves.map((move) => move.fenAfter)];
   const analyses: EngineAnalysis[] = [];
-  options.onProgress?.({ done: 0, total: positionFens.length, stage: 'Preparing game' });
+  options.onProgress?.({ done: 0, total: positionFens.length, stage: 'Preparing Analyzer V2' });
 
   let activeMode = options.engineMode;
   try {
@@ -171,85 +141,21 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     }
   }
 
-  // Pass 1: fast, single-PV evaluation of every position.
+  // Analyzer Engine V2: one frozen, reproducible Stockfish measurement pass.
+  // There is intentionally no second verification or re-analysis stage.
+  const preset = ANALYSIS_PRESETS[options.quality];
   for (let i = 0; i < positionFens.length; i++) {
     if (options.signal?.aborted) {
       await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
       throw new DOMException('Analysis cancelled.', 'AbortError');
     }
-    options.onProgress?.({ done: i, total: positionFens.length, stage: `Analyzing position ${i + 1} of ${positionFens.length}` });
-    analyses.push(await analyzePosition(positionFens[i], activeMode, options.quality, 1));
-  }
-
-  // V0.2.4 keeps the cool V0.2.3 verification path. Standard no longer
-  // rechecks ordinary errors or every boundary candidate. It may perform at most
-  // two very short time-bounded searches for mate or special-best ambiguity.
-  // Deep/Maximum retain a broader verification path by explicit user choice.
-  const preset = ANALYSIS_PRESETS[options.quality];
-  const verifyPositions = new Map<number, VerifyTarget>();
-  if (preset.reviewVerifyLimit > 0 && preset.reviewVerifyMovetimeMs > 0) {
-    for (let i = 0; i < moves.length; i++) {
-      const color = moves[i].source.color as 'w' | 'b';
-      const rating = ratingFor(color, whiteElo, blackElo);
-      const before = analyses[i];
-      const after = analyses[i + 1];
-      const loss = expectedLoss(before.scoreCp, after.scoreCp, color, rating);
-      const isBook = i < 28 && isLikelyBookMove(sans, i);
-      const isBestCandidate = moves[i].uci === before.bestMove && !isBook;
-      const mateCandidate = Boolean(before.mate || after.mate);
-      const tacticalCandidate = movedPieceIsEnPrise(moves[i].fenAfter, moves[i].uci.slice(2, 4));
-      const legalCount = new Chess(moves[i].fenBefore).moves().length;
-      const beforeExpected = moverExpectedScore(before.scoreCp, color, rating);
-      const specialBestCandidate = isBestCandidate
-        && beforeExpected >= 0.16
-        && beforeExpected <= 0.84
-        && (tacticalCandidate || legalCount <= 3);
-
-      if (mateCandidate) {
-        addVerifyPosition(verifyPositions, i, positionFens.length, Math.min(2, preset.reviewMultiPV), 100);
-        continue;
-      }
-
-      if (specialBestCandidate) {
-        addVerifyPosition(verifyPositions, i, positionFens.length, preset.reviewMultiPV, tacticalCandidate ? 86 : 78);
-      }
-
-      // Only Deep/Maximum spend second-pass work on ordinary classification
-      // boundaries/errors. Standard deliberately finishes from its primary pass.
-      if (preset.reviewVerifyErrors) {
-        const boundaryCandidate = !isBook && moves[i].uci !== before.bestMove && nearClassificationBoundary(loss);
-        const importantError = loss >= 0.11;
-        if (boundaryCandidate || importantError) {
-          addVerifyPosition(verifyPositions, i, positionFens.length, boundaryCandidate ? preset.reviewMultiPV : 1, importantError ? 70 : 62);
-          if (importantError) addVerifyPosition(verifyPositions, i + 1, positionFens.length, 1, 66);
-        }
-      }
-    }
-  }
-
-  const verifyList = [...verifyPositions.entries()]
-    .sort((a, b) => b[1].priority - a[1].priority || a[0] - b[0])
-    .slice(0, preset.reviewVerifyLimit);
-
-  for (let n = 0; n < verifyList.length; n++) {
-    if (options.signal?.aborted) {
-      await engineManager.get(activeMode).then((engine) => engine.stop()).catch(() => undefined);
-      throw new DOMException('Analysis cancelled.', 'AbortError');
-    }
-    const [positionIndex, target] = verifyList[n];
     options.onProgress?.({
-      done: positionFens.length - 1,
+      done: i,
       total: positionFens.length,
-      stage: `Refining special position ${n + 1} of ${verifyList.length}`,
+      stage: `Analyzing position ${i + 1} of ${positionFens.length}`,
     });
-    analyses[positionIndex] = await analyzePosition(
-      positionFens[positionIndex],
-      activeMode,
-      options.quality,
-      target.multiPV,
-      { movetime: preset.reviewVerifyMovetimeMs },
-    );
-    if (n + 1 < verifyList.length) await coolDown(preset.reviewVerifyPauseMs);
+    analyses.push(await analyzeReviewPosition(positionFens[i], activeMode, options.quality));
+    if (i + 1 < positionFens.length) await sleep(preset.reviewPauseMs);
   }
 
   const reviewMoves: ReviewMove[] = moves.map((move, index) => {
@@ -257,14 +163,17 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
     const after = analyses[index + 1];
     const color = move.source.color as 'w' | 'b';
     const rating = ratingFor(color, whiteElo, blackElo);
+    const dropPct = winPercentDrop(before.scoreCp, after.scoreCp, color, rating);
     const loss = expectedLoss(before.scoreCp, after.scoreCp, color, rating);
-    const bestMove = before.bestMove;
+    const cpLoss = Math.max(0, moverCp(before.scoreCp, color) - moverCp(after.scoreCp, color));
     const legalCount = new Chess(move.fenBefore).moves().length;
     const isBook = index < 28 && isLikelyBookMove(sans, index);
+    const isEngineTop = move.uci.slice(0, 4) === before.bestMove.slice(0, 4);
+    const standard = standardClassification(dropPct);
     const classification = classifyMove({
       loss,
       actualUci: move.uci,
-      bestUci: bestMove,
+      bestUci: before.bestMove,
       lines: before.lines,
       color,
       isBook,
@@ -275,24 +184,12 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       legalCount,
       beforeCp: before.scoreCp,
       afterCp: after.scoreCp,
-      rating,
-    });
-    const tags = specialTags({
-      loss,
-      beforeCp: before.scoreCp,
-      afterCp: after.scoreCp,
       beforeMate: before.mate,
       afterMate: after.mate,
-      color,
-      lines: before.lines,
-      bestUci: bestMove,
-      actualUci: move.uci,
-      classification,
       rating,
     });
-    if (legalCount === 1 && !tags.includes('Forced Move')) tags.push('Forced Move');
-    if (['Mistake', 'Blunder'].includes(classification) && movedPieceIsEnPrise(move.fenAfter, move.uci.slice(2, 4)) && !tags.includes('Hanging Piece')) tags.push('Hanging Piece');
-    const review: ReviewMove = {
+
+    return {
       ply: index + 1,
       moveNumber: Math.floor(index / 2) + 1,
       color,
@@ -303,13 +200,43 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       evalBefore: before.scoreCp,
       evalAfter: after.scoreCp,
       expectedLoss: loss,
-      bestMove,
+      winPctLoss: dropPct,
+      winPctBefore: moverWinPercent(before.scoreCp, color, rating),
+      winPctAfter: moverWinPercent(after.scoreCp, color, rating),
+      cpLoss,
+      isEngineTop,
+      legalCount,
+      isSacrifice: isSoundSacrificeCandidate({
+        fenBefore: move.fenBefore,
+        fenAfter: move.fenAfter,
+        uci: move.uci,
+        color,
+        piece: move.source.piece,
+        captured: move.source.captured,
+      }),
+      ratingUsed: rating,
+      standardClassification: standard,
+      beforeMate: before.mate,
+      afterMate: after.mate,
+      bestMove: before.bestMove,
       bestLine: before.lines[0]?.pv || [],
       alternatives: before.lines,
       classification,
-      tags,
+      tags: [],
       explanation: '',
-    };
+    } satisfies ReviewMove;
+  });
+
+  // Special categories are relational and deliberately applied only after every
+  // move has stable raw features. This is the key V0.3 architecture change.
+  applyRelationalClassifications(reviewMoves);
+
+  reviewMoves.forEach((review, index) => {
+    review.tags = specialTags({ move: review });
+    if (['Mistake', 'Blunder'].includes(review.classification)
+      && movedPieceIsEnPrise(review.fenAfter, review.uci.slice(2, 4))
+      && !review.tags.includes('Hanging Piece')) review.tags.push('Hanging Piece');
+
     review.explanation = explainMove({
       classification: review.classification,
       tags: review.tags,
@@ -319,57 +246,9 @@ export async function analyzePgn(pgn: string, options: AnalyzeGameOptions): Prom
       fenAfter: review.fenAfter,
       beforeCp: review.evalBefore,
       afterCp: review.evalAfter,
-      replyLine: after.lines[0]?.pv || [],
+      replyLine: analyses[index + 1].lines[0]?.pv || [],
     });
-    return review;
   });
-
-  // V0.2.4 Miss calibration follows the published meaning much more closely:
-  // the opponent must create a *new winning opportunity*, and the player must
-  // then fail to keep that winning status. This avoids both V0.2.2's Miss
-  // inflation and V0.2.3's over-correction where many real Misses became
-  // Blunders. NAG annotations in imported PGNs are intentionally ignored.
-  for (let i = 1; i < reviewMoves.length; i++) {
-    const previous = reviewMoves[i - 1];
-    const current = reviewMoves[i];
-    const rating = ratingFor(current.color, whiteElo, blackElo);
-    const win = winningExpectedThreshold(rating);
-    const beforeOpponentMove = moverExpectedScore(previous.evalBefore, current.color, rating);
-    const opportunity = moverExpectedScore(current.evalBefore, current.color, rating);
-    const afterCurrentMove = moverExpectedScore(current.evalAfter, current.color, rating);
-    const opportunityGain = Math.max(0, opportunity - beforeOpponentMove);
-
-    const newlyWinning = beforeOpponentMove < win - 0.025
-      && opportunity >= win
-      && opportunityGain >= 0.075;
-    const clearlyGiftedChance = opportunityGain >= 0.12 && opportunity >= 0.62;
-    const failedToCashIn = afterCurrentMove < win - 0.035
-      || current.expectedLoss >= Math.max(0.085, opportunityGain * 0.52);
-    const underlyingError = ['Inaccuracy', 'Mistake', 'Blunder'].includes(current.classification);
-    const previousWasNotMiss = previous.classification !== 'Miss';
-
-    if (
-      previousWasNotMiss
-      && (newlyWinning || clearlyGiftedChance)
-      && failedToCashIn
-      && underlyingError
-      && !current.tags.includes('Missed Mate')
-    ) {
-      current.classification = 'Miss';
-      if (!current.tags.includes('Missed Tactic')) current.tags.push('Missed Tactic');
-      current.explanation = explainMove({
-        classification: 'Miss',
-        tags: current.tags,
-        san: current.san,
-        bestMove: current.bestMove,
-        fenBefore: current.fenBefore,
-        fenAfter: current.fenAfter,
-        beforeCp: current.evalBefore,
-        afterCp: current.evalAfter,
-        replyLine: analyses[i + 1].lines[0]?.pv || [],
-      });
-    }
-  }
 
   trimCriticalMoments(reviewMoves);
 

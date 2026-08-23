@@ -32,3 +32,10 @@ The default chess piece artwork in `public/pieces/cburnett/` is the Cburnett
 Staunton-style set by Colin M. L. Burnett. The project uses this open-source
 piece set rather than copying Chess.com artwork. Keep the applicable upstream
 attribution/license information when redistributing the piece files.
+
+
+## Chess-Review methodology reference
+
+V0.3 was designed after reviewing the public T-Julsgaard/Chess-Review project as an architectural benchmark for local calibration (stable engine settings, single-PV classification, calibration/regression workflow). Chess-Review is GPL-3.0 licensed. No Chess-Review source code, calibration JSON, images, sounds, or other assets are copied or bundled in this project.
+
+Upstream reference: https://github.com/T-Julsgaard/Chess-Review
